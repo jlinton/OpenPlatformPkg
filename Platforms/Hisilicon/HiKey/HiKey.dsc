@@ -305,6 +305,12 @@
   gArmTokenSpaceGuid.PcdSystemMemoryBase|0x00000000
   gArmTokenSpaceGuid.PcdSystemMemorySize|0x3E000000
 
+  #
+  # SMBIOS version
+  #
+  gEfiMdeModulePkgTokenSpaceGuid.PcdSmbiosVersion|0x0300
+  gEfiMdeModulePkgTokenSpaceGuid.PcdSmbiosDocRev|0x0
+
   # HiKey Dual-Cluster profile
   gArmPlatformTokenSpaceGuid.PcdCoreCount|8
   gArmPlatformTokenSpaceGuid.PcdClusterCount|2
@@ -429,6 +435,12 @@
   MdeModulePkg/Universal/WatchdogTimerDxe/WatchdogTimer.inf
 
   MdeModulePkg/Universal/PCD/Dxe/Pcd.inf
+
+  #
+  # SMBIOS/DMI
+  #
+  MdeModulePkg/Universal/SmbiosDxe/SmbiosDxe.inf
+  OpenPlatformPkg/Platforms/Hisilicon/HiKey/SmbiosPlatformDxe/SmbiosPlatformDxe.inf
 
   #
   # GPIO
