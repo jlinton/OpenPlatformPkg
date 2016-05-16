@@ -26,6 +26,11 @@
 #include <PiDxe.h>
 #include <Protocol/Smbios.h>
 
+#include <Hi6220.h>
+
+#define HIKEY_EXTRA_SYSTEM_MEMORY_BASE  0x40000000
+#define HIKEY_EXTRA_SYSTEM_MEMORY_SIZE  0x40000000
+
 #define TYPE0_STRINGS                                    \
   "EFI Development Kit II / Hisilicon\0" /* Vendor */      \
   "EDK II\0"                             /* BiosVersion */ \
@@ -51,7 +56,7 @@
   "Serial Not Set\0"                 /* Serial  */
 
 #define TYPE4_STRINGS                                             \
-  "BGA-1156\0"                       /* socket type */            \
+  "BGA-653\0"                        /* socket type */            \
   "Hisilicon\0"                      /* manufactuer */            \
   "Cortex-A53\0"                     /* processor description */  \
   "0xd03\0"                          /* A53 part number */
@@ -75,7 +80,10 @@
 
 #define TYPE17_STRINGS                                       \
   "RIGHT SIDE\0"                     /* location */          \
-  "BANK 0\0"                         /* bank description */
+  "BANK 0\0"                         /* bank description */  \
+  "Samsung DDR\0"                    /* Manufacturer */      \
+  "Elpida DDR\0"                     /* Manufacturer */      \
+  "Hynix DDR\0"                      /* Manufacturer */
 
 #define TYPE19_STRINGS                             \
   "\0"                               /* nothing */
@@ -494,9 +502,9 @@ STATIC CONST ARM_TYPE17 mArmDefaultType17 = {
     },
     SMBIOS_HANDLE_MEMORY, //array to which this module belongs
     0xFFFE,               //no errors
-    32,     //single DIMM, no ECC is 32bits (for ecc this would be 72)
-    32,     //data width of this device (32-bits)
-    0x400,  //1024 MB
+    0,     //single DIMM, no ECC is 32bits (for ecc this would be 72)
+    0,     //data width of this device (32-bits)
+    0,      //DDR size
     0x05,   //single chip
     0,      //not part of a set
     1,      //right side of board
@@ -504,7 +512,7 @@ STATIC CONST ARM_TYPE17 mArmDefaultType17 = {
 //  MemoryTypeLpddr3, //LP DDR3, isn't defined yet
     MemoryTypeDdr3,                  //LP DDR3
     {0,0,0,0,0,0,0,0,0,0,0,0,0,0,1}, //unbuffered
-    800,                            //800Mhz DDR
+    0,                               //DDR speed
     0, //varies between diffrent production runs
     0, //serial
     0, //asset tag
@@ -562,11 +570,81 @@ STATIC CONST VOID *DefaultCommonTables[]=
   &mArmDefaultType8_hdmi0,
   &mArmDefaultType9,
   &mArmDefaultType16,
-  &mArmDefaultType17,
-// &mArmDefaultType19, //memory range type 19 dynamically generated
   &mArmDefaultType32,
   NULL
 };
+
+/**
+   Installs a memory device (type17)
+
+   @param  Smbios               SMBIOS protocol
+
+**/
+EFI_STATUS
+InstallMemoryDeviceStructure (
+  IN EFI_SMBIOS_PROTOCOL       *Smbios
+  )
+{
+  UINT32                      Data;
+  UINT32                      VendorID;
+  EFI_SMBIOS_HANDLE           SmbiosHandle;
+  ARM_TYPE17                  MemoryDevice;
+  EFI_STATUS                  Status = EFI_SUCCESS;
+
+  CopyMem(&MemoryDevice, &mArmDefaultType17, sizeof (ARM_TYPE17));
+
+  // Misc. Notes:
+  // Manufacturer IDs can be found in the JEP166B document at http://www.jedec.org/
+  // Mode Register details can be fond in the JESD209-3 document at http://www.jedec.org/
+
+  // LPDDR manufacturer (MR7)
+  MmioWrite32((MDDRC_AXI_BASE + 0x8210), 0x57);
+  MmioWrite32((MDDRC_AXI_BASE + 0x8218), 0x10000);
+  MmioWrite32((MDDRC_AXI_BASE + 0x800c), 0x1);
+
+  do {
+    Data = MmioRead32(MDDRC_AXI_BASE + 0x800C);
+  } while (Data & 1);
+
+  Data = MmioRead32(MDDRC_AXI_BASE + 0x84A8);
+  VendorID = Data & 0xFF;
+
+  switch (VendorID) {
+    case 1:   // Samsung DDR
+      MemoryDevice.Base.Manufacturer = 3;
+      break;
+    case 3:   // Elpida DDR
+      MemoryDevice.Base.Manufacturer = 4;
+      break;
+    case 6:   // Hynix DDR
+      MemoryDevice.Base.Manufacturer = 5;
+      break;
+    default:  // Unknown DDR
+      MemoryDevice.Base.Manufacturer = 0;
+      break;
+  }
+
+  // FIXME: Need to get this from MDDRC
+  MemoryDevice.Base.Size = 1024;
+
+  // FIXME: Need to get this from PLL
+  MemoryDevice.Base.Speed = 800;
+
+  // Only 32-bit bus is supported
+  MemoryDevice.Base.DataWidth = 32;
+  MemoryDevice.Base.TotalWidth = 32;
+
+  SmbiosHandle = MemoryDevice.Base.Hdr.Handle;
+
+  Status = Smbios->Add (
+    Smbios,
+    NULL,
+    &SmbiosHandle,
+    (EFI_SMBIOS_TABLE_HEADER*) &MemoryDevice
+  );
+
+  return Status;
+}
 
 /**
    Installs a memory descriptor (type19) for the given address range
@@ -585,10 +663,10 @@ InstallMemoryStructure (
   ARM_TYPE19                MemoryDescriptor;
   EFI_STATUS                Status = EFI_SUCCESS;
 
-  CopyMem( &MemoryDescriptor, &mArmDefaultType19, sizeof(ARM_TYPE19));
+  CopyMem(&MemoryDescriptor, &mArmDefaultType19, sizeof (ARM_TYPE19));
 
   MemoryDescriptor.Base.ExtendedStartingAddress = StartingAddress;
-  MemoryDescriptor.Base.ExtendedEndingAddress = StartingAddress+RegionLength;
+  MemoryDescriptor.Base.ExtendedEndingAddress = StartingAddress + RegionLength;
   SmbiosHandle = MemoryDescriptor.Base.Hdr.Handle;
 
   Status = Smbios->Add (
@@ -596,7 +674,8 @@ InstallMemoryStructure (
     NULL,
     &SmbiosHandle,
     (EFI_SMBIOS_TABLE_HEADER*) &MemoryDescriptor
-    );
+  );
+
   return Status;
 }
 
@@ -644,18 +723,24 @@ InstallAllStructures (
   EFI_STATUS                Status = EFI_SUCCESS;
 
   // Fixup some table values
-  mArmDefaultType0.Base.SystemBiosMajorRelease = (PcdGet32 ( PcdFirmwareRevision ) >> 16) & 0xFF;
-  mArmDefaultType0.Base.SystemBiosMinorRelease = PcdGet32 ( PcdFirmwareRevision ) & 0xFF;
+  mArmDefaultType0.Base.SystemBiosMajorRelease = (PcdGet32 (PcdFirmwareRevision) >> 16) & 0xFF;
+  mArmDefaultType0.Base.SystemBiosMinorRelease = PcdGet32 (PcdFirmwareRevision) & 0xFF;
   mArmDefaultType2.Base.Version = 0;
 
   //
   // Add all table entries
   //
-  Status=InstallStructures (Smbios, DefaultCommonTables);
+  Status = InstallStructures (Smbios, DefaultCommonTables);
   ASSERT_EFI_ERROR (Status);
 
-  // Generate two memory descriptors for the memory ranges we know about
-  Status = InstallMemoryStructure ( Smbios, PcdGet64 (PcdSystemMemoryBase), PcdGet64 (PcdSystemMemorySize));
+  // Generate memory device descriptios for vendor manufactuer, size, and speed
+  Status = InstallMemoryDeviceStructure (Smbios);
+  ASSERT_EFI_ERROR (Status);
+
+  // Generate memory descriptors for the memory ranges we know about
+  Status = InstallMemoryStructure (Smbios, PcdGet64 (PcdSystemMemoryBase), PcdGet64 (PcdSystemMemorySize));
+  ASSERT_EFI_ERROR (Status);
+  Status = InstallMemoryStructure (Smbios, HIKEY_EXTRA_SYSTEM_MEMORY_BASE, HIKEY_EXTRA_SYSTEM_MEMORY_SIZE);
   ASSERT_EFI_ERROR (Status);
 
   return Status;
@@ -688,7 +773,7 @@ SmbiosTablePublishEntry (
     &gEfiSmbiosProtocolGuid,
     NULL,
     (VOID**)&Smbios
-    );
+  );
   if (EFI_ERROR (Status)) {
     return Status;
   }
