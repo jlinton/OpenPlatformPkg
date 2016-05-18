@@ -2,6 +2,7 @@
   This driver installs SMBIOS information for the HiKey platform
 
   Copyright (c) 2015, ARM Limited. All rights reserved.
+  Copyright (c) 2016, Hisilicon Ltd and Contributors. All rights reserved.
 
   This program and the accompanying materials
   are licensed and made available under the terms and conditions of the BSD License
@@ -28,6 +29,8 @@
 
 #include <Hi6220.h>
 
+STATIC BOOLEAN mExtraMemoryPresent = FALSE;
+
 #define HIKEY_EXTRA_SYSTEM_MEMORY_BASE  0x40000000
 #define HIKEY_EXTRA_SYSTEM_MEMORY_SIZE  0x40000000
 
@@ -44,7 +47,7 @@
 
 #define TYPE2_STRINGS                                     \
   "LeMaker\0"                        /* Manufacturer */   \
-  "96Boards LeMaker HiKey\0"  /* Product Name */   \
+  "96Boards LeMaker HiKey\0"         /* Product Name */   \
   "R0\0"                             /* Version */        \
   "Serial Not Set\0"                 /* Serial */         \
   "Base of Chassis\0"                /* board location */ \
@@ -67,13 +70,13 @@
   "L2\0"                             /* L2   */
 
 #define TYPE8_STRINGS                              \
-  "USB0\0"                           /* Port0 */   \
-  "USB1\0"                           /* Port1 */   \
-  "USB_OTG0\0"                       /* Port2 */   \
-  "HDMI0\0"                          /* port3 */
+  "USB 0\0"                           /* Port0 */   \
+  "USB 1\0"                           /* Port1 */   \
+  "USB_OTG 0\0"                       /* Port2 */   \
+  "HDMI 0\0"                          /* port3 */
 
 #define TYPE9_STRINGS                              \
-  "MMC0\0"                           /* Slot0 */
+  "MMC 0\0"                           /* Slot0 */
 
 #define TYPE16_STRINGS                             \
   "\0"                               /* nothing */
@@ -90,7 +93,6 @@
 
 #define TYPE32_STRINGS                             \
   "\0"                               /* nothing */
-
 
 //
 // Type definition and contents of the default SMBIOS table.
@@ -502,8 +504,8 @@ STATIC CONST ARM_TYPE17 mArmDefaultType17 = {
     },
     SMBIOS_HANDLE_MEMORY, //array to which this module belongs
     0xFFFE,               //no errors
-    0,     //single DIMM, no ECC is 32bits (for ecc this would be 72)
-    0,     //data width of this device (32-bits)
+    32,     //single chip, no ECC is 32bits (for ecc this would be 72)
+    32,     //data width of this device (32-bits)
     0,      //DDR size
     0x05,   //single chip
     0,      //not part of a set
@@ -517,7 +519,7 @@ STATIC CONST ARM_TYPE17 mArmDefaultType17 = {
     0, //serial
     0, //asset tag
     0, //part number
-    0, //rank
+    1, //rank
   },
   TYPE17_STRINGS
 };
@@ -560,10 +562,10 @@ STATIC CONST VOID *DefaultCommonTables[]=
   &mArmDefaultType1,
   &mArmDefaultType2,
   &mArmDefaultType3,
+  &mArmDefaultType4_a53,
   &mArmDefaultType7_a53_l1i,
   &mArmDefaultType7_a53_l1d,
   &mArmDefaultType7_a53_l2,
-  &mArmDefaultType4_a53,
   &mArmDefaultType8_usb0,
   &mArmDefaultType8_usb1,
   &mArmDefaultType8_usb_otg0,
@@ -587,26 +589,25 @@ InstallMemoryDeviceStructure (
 {
   UINT32                      Data;
   UINT32                      VendorID;
+  UINT64                      MemorySize;
+  UINT32                      SpeedProfile;
+  UINT64                      RegionMapCount;
   EFI_SMBIOS_HANDLE           SmbiosHandle;
   ARM_TYPE17                  MemoryDevice;
   EFI_STATUS                  Status = EFI_SUCCESS;
 
-  CopyMem(&MemoryDevice, &mArmDefaultType17, sizeof (ARM_TYPE17));
+  CopyMem (&MemoryDevice, &mArmDefaultType17, sizeof (ARM_TYPE17));
 
-  // Misc. Notes:
-  // Manufacturer IDs can be found in the JEP166B document at http://www.jedec.org/
-  // Mode Register details can be fond in the JESD209-3 document at http://www.jedec.org/
-
-  // LPDDR manufacturer (MR7)
-  MmioWrite32((MDDRC_AXI_BASE + 0x8210), 0x57);
-  MmioWrite32((MDDRC_AXI_BASE + 0x8218), 0x10000);
-  MmioWrite32((MDDRC_AXI_BASE + 0x800c), 0x1);
+  // LPDDR manufacturer
+  MmioWrite32 ((MDDRC_DMC_BASE + 0x210), 0x57);
+  MmioWrite32 ((MDDRC_DMC_BASE + 0x218), 0x10000);
+  MmioWrite32 ((MDDRC_DMC_BASE + 0x00c), 0x1);
 
   do {
-    Data = MmioRead32(MDDRC_AXI_BASE + 0x800C);
+    Data = MmioRead32 (MDDRC_DMC_BASE + 0x00C);
   } while (Data & 1);
 
-  Data = MmioRead32(MDDRC_AXI_BASE + 0x84A8);
+  Data = MmioRead32 (MDDRC_DMC_BASE + 0x4A8);
   VendorID = Data & 0xFF;
 
   switch (VendorID) {
@@ -624,15 +625,32 @@ InstallMemoryDeviceStructure (
       break;
   }
 
-  // FIXME: Need to get this from MDDRC
-  MemoryDevice.Base.Size = 1024;
+  // LPDDR size
+  RegionMapCount = 0;
+  while (MmioRead32 (MDDRC_AXI_BASE + AXI_REGION_MAP_OFFSET (RegionMapCount)) != 0) {
+    RegionMapCount++;
+  }
+  Data = MmioRead32 (MDDRC_AXI_BASE + AXI_REGION_MAP_OFFSET (RegionMapCount - 1));
+  MemorySize = 16 << ((Data >> 8) & 0x7);
+  MemorySize += Data << 24;
+  MemoryDevice.Base.Size = (UINT16)((MemorySize << 20) / SIZE_1MB);
 
-  // FIXME: Need to get this from PLL
-  MemoryDevice.Base.Speed = 800;
+  if (MemoryDevice.Base.Size > SIZE_1GB) {
+    mExtraMemoryPresent = TRUE;
+  }
 
-  // Only 32-bit bus is supported
-  MemoryDevice.Base.DataWidth = 32;
-  MemoryDevice.Base.TotalWidth = 32;
+  // LPDDR speed
+  SpeedProfile = MmioRead32 (PMCTRL_DDRCLKDIVCFG);
+  switch (SpeedProfile) {
+    case 0x11111:  // 533 Mhz profile
+      MemoryDevice.Base.Speed = 533;
+      break;
+    case 0x1003:   // 800 MHz profile
+      MemoryDevice.Base.Speed = 800;
+      break;
+    default:  // Unknown profile
+      break;
+  }
 
   SmbiosHandle = MemoryDevice.Base.Hdr.Handle;
 
@@ -663,7 +681,7 @@ InstallMemoryStructure (
   ARM_TYPE19                MemoryDescriptor;
   EFI_STATUS                Status = EFI_SUCCESS;
 
-  CopyMem(&MemoryDescriptor, &mArmDefaultType19, sizeof (ARM_TYPE19));
+  CopyMem (&MemoryDescriptor, &mArmDefaultType19, sizeof (ARM_TYPE19));
 
   MemoryDescriptor.Base.ExtendedStartingAddress = StartingAddress;
   MemoryDescriptor.Base.ExtendedEndingAddress = StartingAddress + RegionLength;
@@ -740,8 +758,10 @@ InstallAllStructures (
   // Generate memory descriptors for the memory ranges we know about
   Status = InstallMemoryStructure (Smbios, PcdGet64 (PcdSystemMemoryBase), PcdGet64 (PcdSystemMemorySize));
   ASSERT_EFI_ERROR (Status);
-  Status = InstallMemoryStructure (Smbios, HIKEY_EXTRA_SYSTEM_MEMORY_BASE, HIKEY_EXTRA_SYSTEM_MEMORY_SIZE);
-  ASSERT_EFI_ERROR (Status);
+  if (mExtraMemoryPresent) {
+    Status = InstallMemoryStructure (Smbios, HIKEY_EXTRA_SYSTEM_MEMORY_BASE, HIKEY_EXTRA_SYSTEM_MEMORY_SIZE);
+    ASSERT_EFI_ERROR (Status);
+  }
 
   return Status;
 }

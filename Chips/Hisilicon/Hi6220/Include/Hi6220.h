@@ -60,10 +60,13 @@
 #define RST0_USBOTG                             BIT6
 #define RST0_USBOTG_32K                         BIT7
 
+#define PMCTRL_DDRCLKDIVCFG                     0xF70325A8
+
 #define EYE_PATTERN_PARA                        0x7053348c
 
 #define MDDRC_AXI_BASE                          0xF7120000
 #define AXI_REGION_MAP                          0x100
+#define AXI_REGION_MAP_OFFSET(x)                ( AXI_REGION_MAP + ( x ) * 0x10 )
 #define HIKEY_REGION_SIZE_MASK                  (7 << 8)
 // (0 << 8) means 16MB, (7 << 8) means 2GB
 #define HIKEY_REGION_SIZE(x)                    (1U << ((((x) & HIKEY_REGION_SIZE_MASK) >> 8) + 24))
@@ -74,6 +77,8 @@
 #define SC_PW_MTCMOS_STAT0                      0x838
 #define SC_PW_MTCMOS_ACK_STAT0                  0x83c
 #define PW_EN0_G3D                              (1 << 1)
+
+#define MDDRC_DMC_BASE                          0xF7128000
 
 #define PMUSSI_BASE                             0xF8000000
 

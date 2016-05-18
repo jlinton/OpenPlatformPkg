@@ -35,6 +35,7 @@
 [Packages]
   ArmPkg/ArmPkg.dec
   ArmPlatformPkg/ArmPlatformPkg.dec
+  OpenPlatformPkg/Chips/Hisilicon/Hi6220/Hi6220.dec
   OpenPlatformPkg/Platforms/Hisilicon/HiKey/HiKey.dec
   MdeModulePkg/MdeModulePkg.dec
   MdePkg/MdePkg.dec
