@@ -30,6 +30,7 @@
 #include <Hi6220.h>
 
 STATIC BOOLEAN mExtraMemoryPresent = FALSE;
+STATIC UINT64  mPhysicalMemorySize = 0;
 
 #define HIKEY_EXTRA_SYSTEM_MEMORY_BASE  0x40000000
 #define HIKEY_EXTRA_SYSTEM_MEMORY_SIZE  0x40000000
@@ -476,7 +477,7 @@ STATIC CONST ARM_TYPE9 mArmDefaultType9 = {
   TYPE9_STRINGS
 };
 
-// Memory array
+// Memory array, this structure overriden by InstallPhysicalMemoryArrayStructure
 STATIC CONST ARM_TYPE16 mArmDefaultType16 = {
   {
     { // SMBIOS_STRUCTURE Hdr
@@ -487,14 +488,14 @@ STATIC CONST ARM_TYPE16 mArmDefaultType16 = {
     MemoryArrayLocationSystemBoard, //on motherboard
     MemoryArrayUseSystemMemory,     //system RAM
     MemoryErrorCorrectionNone,      //HiKey doesn't have ECC RAM
-    0x100000, //1GB
+    0,        //size
     0xFFFE,   //No error information structure
     0x1,      //soldered memory
   },
   TYPE16_STRINGS
 };
 
-// Memory device
+// Memory device, this structure overriden by InstallMemoryDeviceStructure
 STATIC CONST ARM_TYPE17 mArmDefaultType17 = {
   {
     { // SMBIOS_STRUCTURE Hdr
@@ -571,7 +572,6 @@ STATIC CONST VOID *DefaultCommonTables[]=
   &mArmDefaultType8_usb_otg0,
   &mArmDefaultType8_hdmi0,
   &mArmDefaultType9,
-  &mArmDefaultType16,
   &mArmDefaultType32,
   NULL
 };
@@ -602,14 +602,11 @@ InstallMemoryDeviceStructure (
   MmioWrite32 ((MDDRC_DMC_BASE + 0x210), 0x57);
   MmioWrite32 ((MDDRC_DMC_BASE + 0x218), 0x10000);
   MmioWrite32 ((MDDRC_DMC_BASE + 0x00c), 0x1);
-
   do {
     Data = MmioRead32 (MDDRC_DMC_BASE + 0x00C);
   } while (Data & 1);
-
   Data = MmioRead32 (MDDRC_DMC_BASE + 0x4A8);
   VendorID = Data & 0xFF;
-
   switch (VendorID) {
     case 1:   // Samsung DDR
       MemoryDevice.Base.Manufacturer = 3;
@@ -633,9 +630,10 @@ InstallMemoryDeviceStructure (
   Data = MmioRead32 (MDDRC_AXI_BASE + AXI_REGION_MAP_OFFSET (RegionMapCount - 1));
   MemorySize = 16 << ((Data >> 8) & 0x7);
   MemorySize += Data << 24;
-  MemoryDevice.Base.Size = (UINT16)((MemorySize << 20) / SIZE_1MB);
+  mPhysicalMemorySize = (UINT16)((MemorySize << 20) / SIZE_1MB);
+  MemoryDevice.Base.Size = mPhysicalMemorySize;
 
-  if (MemoryDevice.Base.Size > SIZE_1GB) {
+  if (MemoryDevice.Base.Size > (SIZE_1GB / SIZE_1MB)) {
     mExtraMemoryPresent = TRUE;
   }
 
@@ -659,6 +657,36 @@ InstallMemoryDeviceStructure (
     NULL,
     &SmbiosHandle,
     (EFI_SMBIOS_TABLE_HEADER*) &MemoryDevice
+  );
+
+  return Status;
+}
+
+/**
+   Installs a physical memory array (type16)
+
+   @param  Smbios               SMBIOS protocol
+
+**/
+EFI_STATUS
+InstallPhysicalMemoryArrayStructure (
+  IN EFI_SMBIOS_PROTOCOL       *Smbios
+)
+{
+  EFI_SMBIOS_HANDLE         SmbiosHandle;
+  ARM_TYPE16                PhysicalMemoryArrayDescriptor;
+  EFI_STATUS                Status = EFI_SUCCESS;
+
+  CopyMem (&PhysicalMemoryArrayDescriptor, &mArmDefaultType16, sizeof (ARM_TYPE16));
+
+  PhysicalMemoryArrayDescriptor.Base.MaximumCapacity = mPhysicalMemorySize * SIZE_1KB;
+  SmbiosHandle = PhysicalMemoryArrayDescriptor.Base.Hdr.Handle;
+
+  Status = Smbios->Add (
+    Smbios,
+    NULL,
+    &SmbiosHandle,
+    (EFI_SMBIOS_TABLE_HEADER*) &PhysicalMemoryArrayDescriptor
   );
 
   return Status;
@@ -753,6 +781,10 @@ InstallAllStructures (
 
   // Generate memory device descriptios for vendor manufactuer, size, and speed
   Status = InstallMemoryDeviceStructure (Smbios);
+  ASSERT_EFI_ERROR (Status);
+
+  // Generate memory array descriptor for total physical memory in the system
+  Status = InstallPhysicalMemoryArrayStructure (Smbios);
   ASSERT_EFI_ERROR (Status);
 
   // Generate memory descriptors for the memory ranges we know about
