@@ -62,7 +62,7 @@ STATIC UINT64  mPhysicalMemorySize = 0;
 #define TYPE4_STRINGS                                             \
   "BGA-653\0"                        /* socket type */            \
   "Hisilicon\0"                      /* manufactuer */            \
-  "Cortex-A53\0"                     /* processor description */  \
+  "Kirin 620 (2x Cortex-A53 MP4 r0p3) CPU @ 1.2GHz\0" /* processor description */  \
   "0xd03\0"                          /* A53 part number */
 
 #define TYPE7_STRINGS                              \
@@ -85,9 +85,9 @@ STATIC UINT64  mPhysicalMemorySize = 0;
 #define TYPE17_STRINGS                                       \
   "RIGHT SIDE\0"                     /* location */          \
   "BANK 0\0"                         /* bank description */  \
-  "Samsung DDR\0"                    /* Manufacturer */      \
-  "Elpida DDR\0"                     /* Manufacturer */      \
-  "Hynix DDR\0"                      /* Manufacturer */
+  "Samsung\0"                    /* Manufacturer */      \
+  "Elpida\0"                     /* Manufacturer */      \
+  "Hynix\0"                      /* Manufacturer */
 
 #define TYPE19_STRINGS                             \
   "\0"                               /* nothing */
@@ -303,8 +303,8 @@ STATIC CONST ARM_TYPE4 mArmDefaultType4_a53 = {
     ProcessorFamilyIndicatorFamily2, //processor family, acquire from field2
     2, //manufactuer
     {{0,},{0.}}, //processor id
-    4, //version
-    {0,0,0,0,0,1}, //voltage
+    3, //version
+    {0,1,0,0,1,1}, //voltage (1.8V max)
     0, //external clock
     1200, //max speed
     1200, //current speed
@@ -633,7 +633,7 @@ InstallMemoryDeviceStructure (
   mPhysicalMemorySize = (UINT16)((MemorySize << 20) / SIZE_1MB);
   MemoryDevice.Base.Size = mPhysicalMemorySize;
 
-  if (MemoryDevice.Base.Size > (SIZE_1GB / SIZE_1MB)) {
+  if (mPhysicalMemorySize > (SIZE_1GB / SIZE_1MB)) {
     mExtraMemoryPresent = TRUE;
   }
 
