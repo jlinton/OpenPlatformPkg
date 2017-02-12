@@ -1,6 +1,7 @@
 /** @file
 
   Copyright (c) 2015-2016, Linaro Limited. All rights reserved.
+  Copyright (c) 2017, Jeremy Linton
 
   This program and the accompanying materials
   are licensed and made available under the terms and conditions of the BSD License
@@ -25,18 +26,18 @@
 #define HCDMA(_ch)                      HSOTG_REG(0x0514 + 0x20 * (_ch))
 #define HCDMAB(_ch)                     HSOTG_REG(0x051c + 0x20 * (_ch))
 
-#define HCFG                            HSOTG_REG(0x0400)
-#define HFIR                            HSOTG_REG(0x0404)
-#define HFNUM                           HSOTG_REG(0x0408)
-#define HPTXSTS                         HSOTG_REG(0x0410)
-#define HAINT                           HSOTG_REG(0x0414)
-#define HAINTMSK                        HSOTG_REG(0x0418)
-#define HFLBADDR                        HSOTG_REG(0x041c)
+#define HCFG                            HSOTG_REG(0x0400) //Host Config
+#define HFIR                            HSOTG_REG(0x0404) //Host Frame interval register
+#define HFNUM                           HSOTG_REG(0x0408) //Host Frame number/frame time
+#define HPTXSTS                         HSOTG_REG(0x0410) //Host periodic transmit fifo queue status reg
+#define HAINT                           HSOTG_REG(0x0414) //Host all channel interrupt register
+#define HAINTMSK                        HSOTG_REG(0x0418) //Host all channel interrupt mask
+#define HFLBADDR                        HSOTG_REG(0x041c) 
 
 #define GOTGCTL                         HSOTG_REG(0x000)
 #define GOTGINT                         HSOTG_REG(0x004)
 #define GAHBCFG                         HSOTG_REG(0x008)
-#define GUSBCFG                         HSOTG_REG(0x00C)
+#define GUSBCFG                         HSOTG_REG(0x00C) //Global USB config
 #define GRSTCTL                         HSOTG_REG(0x010)
 #define GINTSTS                         HSOTG_REG(0x014)
 #define GINTMSK                         HSOTG_REG(0x018)
@@ -119,7 +120,7 @@
 #define DWC2_GUSBCFG_ULPI_UTMI_SEL_OFFSET		4
 #define DWC2_GUSBCFG_FSINTF				(1 << 5)
 #define DWC2_GUSBCFG_FSINTF_OFFSET			5
-#define DWC2_GUSBCFG_PHYSEL				(1 << 6)
+#define DWC2_GUSBCFG_PHYSEL				(1 << 6) //Phy select (host only) 1 full speed phy, 0 external hign speed
 #define DWC2_GUSBCFG_PHYSEL_OFFSET			6
 #define DWC2_GUSBCFG_DDRSEL				(1 << 7)
 #define DWC2_GUSBCFG_DDRSEL_OFFSET			7
@@ -153,9 +154,9 @@
 #define DWC2_GUSBCFG_IC_TRAFFIC_PULL_REMOVE_OFFSET	27
 #define DWC2_GUSBCFG_TX_END_DELAY			(1 << 28)
 #define DWC2_GUSBCFG_TX_END_DELAY_OFFSET		28
-#define DWC2_GUSBCFG_FORCEHOSTMODE			(1 << 29)
+#define DWC2_GUSBCFG_FORCEHOSTMODE			(1 << 29) //force host mode
 #define DWC2_GUSBCFG_FORCEHOSTMODE_OFFSET		29
-#define DWC2_GUSBCFG_FORCEDEVMODE			(1 << 30)
+#define DWC2_GUSBCFG_FORCEDEVMODE			(1 << 30) //force device mode
 #define DWC2_GUSBCFG_FORCEDEVMODE_OFFSET		30
 #define DWC2_GLPMCTL_LPM_CAP_EN				(1 << 0)
 #define DWC2_GLPMCTL_LPM_CAP_EN_OFFSET			0
@@ -479,7 +480,7 @@
 #define DWC2_HCFG_FSLSPCLKSEL_6_MHZ			2
 #define DWC2_HCFG_FSLSPCLKSEL_MASK			(0x3 << 0)
 #define DWC2_HCFG_FSLSPCLKSEL_OFFSET			0
-#define DWC2_HCFG_FSLSSUPP				(1 << 2)
+#define DWC2_HCFG_FSLSSUPP				(1 << 2) //Force core to enumerate at FS/LS mode
 #define DWC2_HCFG_FSLSSUPP_OFFSET			2
 #define DWC2_HCFG_DESCDMA				(1 << 23)
 #define DWC2_HCFG_DESCDMA_OFFSET			23
@@ -630,14 +631,18 @@
 #define DWC2_HCSPLT_HUBADDR_MASK			(0x7F << 7)
 #define DWC2_HCSPLT_HUBADDR_OFFSET			7
 #define DWC2_HCSPLT_XACTPOS_MASK			(0x3 << 14)
+#define DWC2_HCSPLT_XACTPOS_MID              0
+#define DWC2_HCSPLT_XACTPOS_END              1 //otherwise each transaction needs to indicate if its beginning/mid/end
+#define DWC2_HCSPLT_XACTPOS_BEGIN            2
+#define DWC2_HCSPLT_XACTPOS_ALL              3 //Xact all, is for complete transactions < 188 bytes
 #define DWC2_HCSPLT_XACTPOS_OFFSET			14
-#define DWC2_HCSPLT_COMPSPLT				(1 << 16)
+#define DWC2_HCSPLT_COMPSPLT				(1 << 16) //Do complete split, (request host to do the complete split transaction)
 #define DWC2_HCSPLT_COMPSPLT_OFFSET			16
 #define DWC2_HCSPLT_SPLTENA				(1 << 31)
 #define DWC2_HCSPLT_SPLTENA_OFFSET			31
 #define DWC2_HCINT_XFERCOMP				(1 << 0)
 #define DWC2_HCINT_XFERCOMP_OFFSET			0
-#define DWC2_HCINT_CHHLTD				(1 << 1)
+#define DWC2_HCINT_CHHLTD				(1 << 1) //Channel Halt
 #define DWC2_HCINT_CHHLTD_OFFSET			1
 #define DWC2_HCINT_AHBERR				(1 << 2)
 #define DWC2_HCINT_AHBERR_OFFSET			2
@@ -755,7 +760,8 @@
 #define CONFIG_DWC2_UTMI_WIDTH		8	/* UTMI bus width (8/16) */
 
 #define DWC2_DMA_BURST_SIZE              32      /* DMA burst len */
-#define DWC2_MAX_CHANNELS                16      /* Max # of EPs */
+//#define DWC2_MAX_CHANNELS                16      /* Max # of EPs */
+#define DWC2_MAX_CHANNELS                12      /* Max # of EPs (12 for LS/FS)*/
 #define DWC2_HOST_RX_FIFO_SIZE           (516 + DWC2_MAX_CHANNELS)
 #define DWC2_HOST_NPERIO_TX_FIFO_SIZE    0x100   /* nPeriodic TX FIFO */
 #define DWC2_HOST_PERIO_TX_FIFO_SIZE     0x200   /* Periodic TX FIFO */

@@ -1,6 +1,7 @@
 #/** @file
 #
 #  Copyright (c) 2015-2016, Linaro Limited. All rights reserved.
+#  Copyright (c) 2017, Jeremy Linton
 #
 #  This program and the accompanying materials
 #  are licensed and made available under the terms and conditions of the BSD License
@@ -29,6 +30,7 @@
   EmbeddedPkg/EmbeddedPkg.dec
   MdePkg/MdePkg.dec
   MdeModulePkg/MdeModulePkg.dec
+  OpenPlatformPkg/Drivers/Usb/DwUsbDxe/DwUsbDxe.dec
 
 [LibraryClasses]
   DmaLib
@@ -51,5 +53,7 @@
   gEfiDriverBindingProtocolGuid
   gEfiUsb2HcProtocolGuid
 
-#[Pcd]
-#  gDwUsbDxeTokenSpaceGuid.PcdDwUsbDxeBaseAddress
+[Pcd]
+  gDwUsbDxeTokenSpaceGuid.PcdDwUsbBaseAddress
+  gDwUsbDxeTokenSpaceGuid.PcdDwUsbSysCtrlBaseAddress
+
