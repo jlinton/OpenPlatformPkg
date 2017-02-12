@@ -45,12 +45,15 @@
 
 #define SC_PERIPH_CTRL8                         0x018
 #define SC_PERIPH_CLKEN0                        0x200
+#define SC_PERIPH_CLKEN3                        0x230
 #define SC_PERIPH_CLKDIS0                       0x204
 #define SC_PERIPH_CLKSTAT0                      0x208
 
 #define SC_PERIPH_RSTEN0                        0x300
+#define SC_PERIPH_RSTEN3                        0x330
 #define SC_PERIPH_RSTDIS0                       0x304
 #define SC_PERIPH_RSTSTAT0                      0x308
+
 
 #define RST0_USBOTG_BUS                         BIT4
 #define RST0_POR_PICOPHY                        BIT5
