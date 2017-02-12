@@ -2,6 +2,7 @@
 #
 #  Copyright (c) 2015, Linaro Limited. All rights reserved.
 #  Copyright (c) 2015, Hisilicon Limited. All rights reserved.
+#  Copyright (c) 2017, Jeremy Linton
 #
 #  This program and the accompanying materials
 #  are licensed and made available under the terms and conditions of the BSD License
@@ -23,23 +24,28 @@
 
 [Sources.common]
   DwUsbDxe.c
+  ComponentName.c
 
 [LibraryClasses]
   DebugLib
   IoLib
   MemoryAllocationLib
   TimerLib
+  UefiLib
   UefiBootServicesTableLib
   UefiDriverEntryPoint
   UncachedMemoryAllocationLib
   CacheMaintenanceLib
 
 [Guids]
-  gArmGlobalVariableGuid
+  gEfiEventExitBootServicesGuid                 ## consume
 
 [Protocols]
   gEfiDriverBindingProtocolGuid
   gUsbDeviceProtocolGuid
+  gEfiUsbHcProtocolGuid                         ## produce
+  gEfiPciIoProtocolGuid                         ## TO_START
+
 
 [Packages]
   ArmPkg/ArmPkg.dec
@@ -47,7 +53,8 @@
   MdePkg/MdePkg.dec
   MdeModulePkg/MdeModulePkg.dec
   EmbeddedPkg/EmbeddedPkg.dec
+  OpenPlatformPkg/Drivers/Usb/DwUsbDxe/DwUsbDxe.dec
 
 [Pcd]
-  gEmbeddedTokenSpaceGuid.PcdDwUsbBaseAddress
-  gEmbeddedTokenSpaceGuid.PcdSysCtrlBaseAddress
+  gDwUsbDxeTokenSpaceGuid.PcdDwUsbBaseAddress
+  gDwUsbDxeTokenSpaceGuid.PcdDwUsbSysCtrlBaseAddress

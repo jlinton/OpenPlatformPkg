@@ -2,6 +2,7 @@
 
   Copyright (c) 2015, Linaro Limited. All rights reserved.
   Copyright (c) 2015, Hisilicon Limited. All rights reserved.
+  Copyright (c) 2017, Jeremy Linton. All rights reserved.
 
   This program and the accompanying materials
   are licensed and made available under the terms and conditions of the BSD License
@@ -17,9 +18,12 @@
 #define __DW_USB_DXE_H__
 
 #define DW_USB_BASE FixedPcdGet32 (PcdDwUsbBaseAddress)
-#define USB_PHY_BASE FixedPcdGet32 (PcdSysCtrlBaseAddress)
+#define USB_PHY_BASE FixedPcdGet32 (PcdDwUsbSysCtrlBaseAddress)
 
-#define SC_PERIPH_CTRL4			0x00c
+// This stuff is a verbatim copy of the linux phy-hi6220-usb.c driver
+// Its also in the linaro hikey edk2 git tree.
+// No real explanation of what these do beyond that file.
+/*#define SC_PERIPH_CTRL4			0x00c
 
 #define CTRL4_PICO_SIDDQ		BIT6
 #define CTRL4_PICO_OGDISABLE		BIT8
@@ -47,14 +51,29 @@
 #define RST0_USBOTG			BIT6
 #define RST0_USBOTG_32K			BIT7
 
-#define EYE_PATTERN_PARA		0x7053348c
+#define EYE_PATTERN_PARA		0x7053348c*/
+
+// GPIO pins to enable hub and turn on host mode
+#define GPIODATA_3              0x0020
+#define GPIODATA_7              0x0200
+#define GPIODIR                 0x0400
+#define GPIOAFSEL               0x0420
+
+#define USB_SEL_GPIO0_3          3     // GPIO 0_3
+#define USB_5V_HUB_EN            7     // GPIO 0_7
+#define USB_ID_DET_GPIO2_5       21    // GPIO 2_5
+#define USB_VBUS_DET_GPIO2_6     22    // GPIO 2_6
+ 
 
 #define PHY_READ_REG32(Offset) MmioRead32 (USB_PHY_BASE + Offset)
 #define PHY_WRITE_REG32(Offset, Val)  MmioWrite32 (USB_PHY_BASE + Offset, Val)
+#define GPIO_READ_REG32(Offset) MmioRead32(0xf8011000+Offset)
+#define GPIO_WRITE_REG32(Offset, Val) MmioWrite32(0xf8011000+Offset,Val)
 
-
+#define READ_REG64(Offset) MmioRead64 (DW_USB_BASE + Offset)
 #define READ_REG32(Offset) MmioRead32 (DW_USB_BASE + Offset)
 #define READ_REG16(Offset) (UINT16) READ_REG32 (Offset)
+#define WRITE_REG64(Offset, Val)  MmioWrite64 (DW_USB_BASE + Offset, Val)
 #define WRITE_REG32(Offset, Val)  MmioWrite32 (DW_USB_BASE + Offset, Val)
 #define WRITE_REG16(Offset, Val)  MmioWrite32 (DW_USB_BASE + Offset, (UINT32) Val)
 #define WRITE_REG8(Offset, Val)   MmioWrite32 (DW_USB_BASE + Offset, (UINT32) Val)
@@ -214,18 +233,50 @@
 
 /*** OTG LINK CORE REGISTERS ***/
 /* Core Global Registers */
-#define GOTGCTL     			(0x000)
+#define GOTGCTL     			(0x000) 
 #define GOTGINT     			(0x004)
-#define GAHBCFG     			(0x008)
+#define GAHBCFG     			(0x008) //Global AHB Config
+#define GAHBCFG_AHB_SINGLE              (1 << 23)
+#define GAHBCFG_NOTI_ALL_DMA_WRIT       (1 << 22)
+#define GAHBCFG_REM_MEM_SUPP            (1 << 21)
+#define GAHBCFG_P_TXF_EMP_LVL           (1 << 8)
+#define GAHBCFG_NP_TXF_EMP_LVL          (1 << 7)
+#define GAHBCFG_DMA_EN                  (1 << 5)
+#define GAHBCFG_HBSTLEN_MASK            (0xf << 1)
+#define GAHBCFG_HBSTLEN_SHIFT           1
+#define GAHBCFG_HBSTLEN_SINGLE          0
+#define GAHBCFG_HBSTLEN_INCR            1
+#define GAHBCFG_HBSTLEN_INCR4           3
+#define GAHBCFG_HBSTLEN_INCR8           5
+#define GAHBCFG_HBSTLEN_INCR16          7
+#define GAHBCFG_GLBL_INTR_EN            (1 << 0)
+#define GAHBCFG_CTRL_MASK               (GAHBCFG_P_TXF_EMP_LVL | \
+                                         GAHBCFG_NP_TXF_EMP_LVL | \
+                                         GAHBCFG_DMA_EN | \
+                                         GAHBCFG_GLBL_INTR_EN)
 #define GUSBCFG     			(0x00C)
-#define GRSTCTL     			(0x010)
-#define GINTSTS				(0x014)
+#define GRSTCTL     			(0x010) //Global reset control
+#define GRSTCTL_AHBIDLE                 (1 << 31)
+#define GRSTCTL_DMAREQ                  (1 << 30)
+#define GRSTCTL_TXFNUM_MASK             (0x1f << 6)
+#define GRSTCTL_TXFNUM_SHIFT            6
+#define GRSTCTL_TXFNUM_LIMIT            0x1f
+#define GRSTCTL_TXFNUM(_x)              ((_x) << 6)
+#define GRSTCTL_TXFFLSH                 (1 << 5)
+#define GRSTCTL_RXFFLSH                 (1 << 4)
+#define GRSTCTL_IN_TKNQ_FLSH            (1 << 3)
+#define GRSTCTL_FRMCNTRRST              (1 << 2)
+#define GRSTCTL_HSFTRST                 (1 << 1)
+#define GRSTCTL_CSFTRST                 (1 << 0)
+
+#define GINTSTS				    (0x014)
 #define GINTMSK     			(0x018)
 #define GRXSTSR     			(0x01C)
 #define GRXSTSP     			(0x020)
-#define GRXFSIZ     			(0x024)
-#define GNPTXFSIZ   			(0x028)
-#define GNPTXSTS    			(0x02C)
+#define GRXFSIZ     			(0x024) //Global RX FIFO Size
+#define GNPTXFSIZ   			(0x028) //Global non periodic TX FIFO Size
+#define GNPTXSTS    			(0x02C) //Global non periodic TX FIFO Status
+#define GSNPSID                 (0x040) //looks like a chip version?
 
 #define GHWCFG1     			(0x044)
 #define GHWCFG2     			(0x048)
@@ -255,119 +306,89 @@
 
 /*** HOST MODE REGISTERS ***/
 /* Host Global Registers */
-#define HCFG       			(0x400)
-#define HFIR       			(0x404)
-#define HFNUM      			(0x408)
-#define HPTXSTS    			(0x410)
-#define HAINT      			(0x414)
-#define HAINTMSK   			(0x418)
+#define HCFG       			(0x400) // host config
+#define HFIR       			(0x404) // host frame interval
+#define HFNUM      			(0x408) // host frame number
+#define HFNUM_FRNUM_MASK                (0xffff << 0) 
+#define HPTXSTS    			(0x410) // host tx fifo stats
+#define HAINT      			(0x414) // host all channels interrupt flags
+#define HAINTMSK   			(0x418) // host all channels interrupt mask
 
 /* Host Port Control and Status Registers */
 #define HPRT        			(0x440)
+#define HPRT0_SPD_MASK                  (0x3 << 17)
+#define HPRT0_SPD_SHIFT                 17
+#define HPRT0_SPD_HIGH_SPEED            0
+#define HPRT0_SPD_FULL_SPEED            1
+#define HPRT0_SPD_LOW_SPEED             2
+#define HPRT0_TSTCTL_MASK               (0xf << 13)
+#define HPRT0_TSTCTL_SHIFT              13
+#define HPRT0_PWR                       (1 << 12)
+#define HPRT0_LNSTS_MASK                (0x3 << 10)
+#define HPRT0_LNSTS_SHIFT               10
+#define HPRT0_RST                       (1 << 8)
+#define HPRT0_SUSP                      (1 << 7)
+#define HPRT0_RES                       (1 << 6)
+#define HPRT0_OVRCURRCHG                (1 << 5)
+#define HPRT0_OVRCURRACT                (1 << 4)
+#define HPRT0_ENACHG                    (1 << 3)
+#define HPRT0_ENA                       (1 << 2)
+#define HPRT0_CONNDET                   (1 << 1)
+#define HPRT0_CONNSTS                   (1 << 0)
 
 /* Host Channel-Specific Registers */
-#define HCCHAR(x)   			(0x500 + 0x20 * (x))
+#define HCCHAR(x)   			(0x500 + 0x20 * (x)) //channel characteristics
+#define HCCHAR_CHENA                    (1 << 31) // channel enable
+#define HCCHAR_CHDIS                    (1 << 30) // channel disable
+#define HCCHAR_ODDFRM                   (1 << 29)
+#define HCCHAR_DEVADDR_MASK             (0x7f << 22)
+#define HCCHAR_DEVADDR_SHIFT            22
+#define HCCHAR_MULTICNT_MASK            (0x3 << 20)
+#define HCCHAR_MULTICNT_SHIFT           20
+#define HCCHAR_EPTYPE_MASK              (0x3 << 18)
+#define HCCHAR_EPTYPE_SHIFT             18
+#define HCCHAR_LSPDDEV                  (1 << 17)
+#define HCCHAR_EPDIR                    (1 << 15)
+#define HCCHAR_EPNUM_MASK               (0xf << 11)
+#define HCCHAR_EPNUM_SHIFT              11
+#define HCCHAR_MPS_MASK                 (0x7ff << 0)
+#define HCCHAR_MPS_SHIFT                0
 #define HCSPLT(x)   			(0x504 + 0x20 * (x))
 #define HCINT(x)    			(0x508 + 0x20 * (x))
 #define HCINTMSK(x) 			(0x50C + 0x20 * (x))
-#define HCTSIZ(x)   			(0x510 + 0x20 * (x))
+#define HCINTMSK_RESERVED14_31          (0x3ffff << 14)
+#define HCINTMSK_FRM_LIST_ROLL          (1 << 13)
+#define HCINTMSK_XCS_XACT               (1 << 12)
+#define HCINTMSK_BNA                    (1 << 11)
+#define HCINTMSK_DATATGLERR             (1 << 10)
+#define HCINTMSK_FRMOVRUN               (1 << 9)
+#define HCINTMSK_BBLERR                 (1 << 8)
+#define HCINTMSK_XACTERR                (1 << 7)
+#define HCINTMSK_NYET                   (1 << 6)
+#define HCINTMSK_ACK                    (1 << 5)
+#define HCINTMSK_NAK                    (1 << 4)
+#define HCINTMSK_STALL                  (1 << 3)
+#define HCINTMSK_AHBERR                 (1 << 2)
+#define HCINTMSK_CHHLTD                 (1 << 1) //channel halted
+#define HCINTMSK_XFERCOMPL              (1 << 0)
+#define HCTSIZ(x)   			(0x510 + 0x20 * (x)) //transfer size/packet reg
+#define TSIZ_DOPNG                      (1 << 31) //do ping before transfer
+#define TSIZ_SC_MC_PID_MASK             (0x3 << 29) //USB packet id
+#define TSIZ_SC_MC_PID_SHIFT            29
+#define TSIZ_SC_MC_PID_DATA0            0
+#define TSIZ_SC_MC_PID_DATA2            1
+#define TSIZ_SC_MC_PID_DATA1            2
+#define TSIZ_SC_MC_PID_MDATA            3
+#define TSIZ_SC_MC_PID_SETUP            3
+#define TSIZ_PKTCNT_MASK                (0x3ff << 19)
+#define TSIZ_PKTCNT_SHIFT               19
+#define TSIZ_NTD_MASK                   (0xff << 8)
+#define TSIZ_NTD_SHIFT                  8
+#define TSIZ_SCHINFO_MASK               (0xff << 0)
+#define TSIZ_SCHINFO_SHIFT              0
+#define TSIZ_XFERSIZE_MASK              (0x7ffff << 0)
+#define TSIZ_XFERSIZE_SHIFT             0
 #define HCDMA(x)    			(0x514 + 0x20 * (x))
-#define HCCHAR0     			(0x500)
-#define HCSPLT0     			(0x504)
-#define HCINT0      			(0x508)
-#define HCINTMSK0   			(0x50C)
-#define HCTSIZ0     			(0x510)
-#define HCDMA0      			(0x514)
-#define HCCHAR1     			(0x520)
-#define HCSPLT1     			(0x524)
-#define HCINT1      			(0x528)
-#define HCINTMSK1   			(0x52C)
-#define HCTSIZ1     			(0x530)
-#define HCDMA1      			(0x534)
-#define HCCHAR2     			(0x540)
-#define HCSPLT2     			(0x544)
-#define HCINT2      			(0x548)
-#define HCINTMSK2   			(0x54C)
-#define HCTSIZ2     			(0x550)
-#define HCDMA2      			(0x554)
-#define HCCHAR3     			(0x560)
-#define HCSPLT3     			(0x564)
-#define HCINT3      			(0x568)
-#define HCINTMSK3   			(0x56C)
-#define HCTSIZ3     			(0x570)
-#define HCDMA3      			(0x574)
-#define HCCHAR4     			(0x580)
-#define HCSPLT4     			(0x584)
-#define HCINT4      			(0x588)
-#define HCINTMSK4   			(0x58C)
-#define HCTSIZ4     			(0x590)
-#define HCDMA4      			(0x594)
-#define HCCHAR5     			(0x5A0)
-#define HCSPLT5     			(0x5A4)
-#define HCINT5      			(0x5A8)
-#define HCINTMSK5   			(0x5AC)
-#define HCTSIZ5     			(0x5B0)
-#define HCDMA5      			(0x5B4)
-#define HCCHAR6     			(0x5C0)
-#define HCSPLT6     			(0x5C4)
-#define HCINT6      			(0x5C8)
-#define HCINTMSK6   			(0x5CC)
-#define HCTSIZ6     			(0x5D0)
-#define HCDMA6      			(0x5D4)
-#define HCCHAR7     			(0x5E0)
-#define HCSPLT7     			(0x5E4)
-#define HCINT7      			(0x5E8)
-#define HCINTMSK7   			(0x5EC)
-#define HCTSIZ7     			(0x5F0)
-#define HCDMA7      			(0x5F4)
-#define HCCHAR8     			(0x600)
-#define HCSPLT8     			(0x604)
-#define HCINT8      			(0x608)
-#define HCINTMSK8   			(0x60C)
-#define HCTSIZ8     			(0x610)
-#define HCDMA8      			(0x614)
-#define HCCHAR9     			(0x620)
-#define HCSPLT9     			(0x624)
-#define HCINT9      			(0x628)
-#define HCINTMSK9   			(0x62C)
-#define HCTSIZ9     			(0x630)
-#define HCDMA9      			(0x634)
-#define HCCHAR10    			(0x640)
-#define HCSPLT10    			(0x644)
-#define HCINT10     			(0x648)
-#define HCINTMSK10  			(0x64C)
-#define HCTSIZ10    			(0x650)
-#define HCDMA10     			(0x654)
-#define HCCHAR11    			(0x660)
-#define HCSPLT11    			(0x664)
-#define HCINT11     			(0x668)
-#define HCINTMSK11  			(0x66C)
-#define HCTSIZ11    			(0x670)
-#define HCDMA11     			(0x674)
-#define HCCHAR12    			(0x680)
-#define HCSPLT12    			(0x684)
-#define HCINT12     			(0x688)
-#define HCINTMSK12  			(0x68C)
-#define HCTSIZ12    			(0x690)
-#define HCDMA12     			(0x694)
-#define HCCHAR13    			(0x6A0)
-#define HCSPLT13    			(0x6A4)
-#define HCINT13     			(0x6A8)
-#define HCINTMSK13  			(0x6AC)
-#define HCTSIZ13    			(0x6B0)
-#define HCDMA13     			(0x6B4)
-#define HCCHAR14    			(0x6C0)
-#define HCSPLT14    			(0x6C4)
-#define HCINT14     			(0x6C8)
-#define HCINTMSK14  			(0x6CC)
-#define HCTSIZ14    			(0x6D0)
-#define HCDMA14     			(0x6D4)
-#define HCCHAR15    			(0x6E0)
-#define HCSPLT15    			(0x6E4)
-#define HCINT15     			(0x6E8)
-#define HCINTMSK15  			(0x6EC)
-#define HCTSIZ15    			(0x6F0)
-#define HCDMA15     			(0x6F4)
 
 /*** DEVICE MODE REGISTERS ***/
 /* Device Global Registers */
@@ -391,145 +412,21 @@
 #define DIEPDMA(x)  			(0x914 + 0x20 * (x))
 #define DTXFSTS(x)  			(0x918 + 0x20 * (x))
 
-#define DIEPCTL0    			(0x900)
-#define DIEPINT0    			(0x908)
-#define DIEPTSIZ0   			(0x910)
-#define DIEPDMA0    			(0x914)
-#define DIEPCTL1    			(0x920)
-#define DIEPINT1    			(0x928)
-#define DIEPTSIZ1   			(0x930)
-#define DIEPDMA1    			(0x934)
-#define DIEPCTL2    			(0x940)
-#define DIEPINT2    			(0x948)
-#define DIEPTSIZ2  			(0x950)
-#define DIEPDMA2    			(0x954)
-#define DIEPCTL3    			(0x960)
-#define DIEPINT3    			(0x968)
-#define DIEPTSIZ3   			(0x970)
-#define DIEPDMA3    			(0x974)
-#define DIEPCTL4    			(0x980)
-#define DIEPINT4    			(0x988)
-#define DIEPTSIZ4   			(0x990)
-#define DIEPDMA4    			(0x994)
-#define DIEPCTL5    			(0x9A0)
-#define DIEPINT5    			(0x9A8)
-#define DIEPTSIZ5   			(0x9B0)
-#define DIEPDMA5    			(0x9B4)
-#define DIEPCTL6    			(0x9C0)
-#define DIEPINT6    			(0x9C8)
-#define DIEPTSIZ6   			(0x9D0)
-#define DIEPDMA6    			(0x9D4)
-#define DIEPCTL7    			(0x9E0)
-#define DIEPINT7    			(0x9E8)
-#define DIEPTSIZ7   			(0x9F0)
-#define DIEPDMA7    			(0x9F4)
-#define DIEPCTL8    			(0xA00)
-#define DIEPINT8    			(0xA08)
-#define DIEPTSIZ8   			(0xA10)
-#define DIEPDMA8    			(0xA14)
-#define DIEPCTL9    			(0xA20)
-#define DIEPINT9    			(0xA28)
-#define DIEPTSIZ9   			(0xA30)
-#define DIEPDMA9    			(0xA34)
-#define DIEPCTL10   			(0xA40)
-#define DIEPINT10   			(0xA48)
-#define DIEPTSIZ10  			(0xA50)
-#define DIEPDMA10   			(0xA54)
-#define DIEPCTL11   			(0xA60)
-#define DIEPINT11   			(0xA68)
-#define DIEPTSIZ11  			(0xA70)
-#define DIEPDMA11   			(0xA74)
-#define DIEPCTL12   			(0xA80)
-#define DIEPINT12   			(0xA88)
-#define DIEPTSIZ12  			(0xA90)
-#define DIEPDMA12   			(0xA94)
-#define DIEPCTL13   			(0xAA0)
-#define DIEPINT13   			(0xAA8)
-#define DIEPTSIZ13  			(0xAB0)
-#define DIEPDMA13   			(0xAB4)
-#define DIEPCTL14   			(0xAC0)
-#define DIEPINT14   			(0xAC8)
-#define DIEPTSIZ14  			(0xAD0)
-#define DIEPDMA14   			(0xAD4)
-#define DIEPCTL15   			(0xAE0)
-#define DIEPINT15   			(0xAE8)
-#define DIEPTSIZ15  			(0xAF0)
-#define DIEPDMA15   			(0xAF4)
-
 /* Device Logical OUT Endpoint-Specific Registers */
 #define DOEPCTL(x)  			(0xB00 + 0x20 * (x))
 #define DOEPINT(x)  			(0xB08 + 0x20 * (x))
 #define DOEPTSIZ(x) 			(0xB10 + 0x20 * (x))
 #define DOEPDMA(x)  			(0xB14 + 0x20 * (x))
-#define DOEPCTL0    			(0xB00)
-#define DOEPINT0    			(0xB08)
-#define DOEPTSIZ0   			(0xB10)
-#define DOEPDMA0    			(0xB14)
-#define DOEPCTL1    			(0xB20)
-#define DOEPINT1    			(0xB28)
-#define DOEPTSIZ1   			(0xB30)
-#define DOEPDMA1    			(0xB34)
-#define DOEPCTL2    			(0xB40)
-#define DOEPINT2    			(0xB48)
-#define DOEPTSIZ2   			(0xB50)
-#define DOEPDMA2    			(0xB54)
-#define DOEPCTL3    			(0xB60)
-#define DOEPINT3    			(0xB68)
-#define DOEPTSIZ3   			(0xB70)
-#define DOEPDMA3    			(0xB74)
-#define DOEPCTL4    			(0xB80)
-#define DOEPINT4    			(0xB88)
-#define DOEPTSIZ4   			(0xB90)
-#define DOEPDMA4    			(0xB94)
-#define DOEPCTL5    			(0xBA0)
-#define DOEPINT5    			(0xBA8)
-#define DOEPTSIZ5   			(0xBB0)
-#define DOEPDMA5    			(0xBB4)
-#define DOEPCTL6    			(0xBC0)
-#define DOEPINT6    			(0xBC8)
-#define DOEPTSIZ6   			(0xBD0)
-#define DOEPDMA6    			(0xBD4)
-#define DOEPCTL7    			(0xBE0)
-#define DOEPINT7    			(0xBE8)
-#define DOEPTSIZ7   			(0xBF0)
-#define DOEPDMA7    			(0xBF4)
-#define DOEPCTL8    			(0xC00)
-#define DOEPINT8    			(0xC08)
-#define DOEPTSIZ8   			(0xC10)
-#define DOEPDMA8    			(0xC14)
-#define DOEPCTL9    			(0xC20)
-#define DOEPINT9    			(0xC28)
-#define DOEPTSIZ9   			(0xC30)
-#define DOEPDMA9    			(0xC34)
-#define DOEPCTL10   			(0xC40)
-#define DOEPINT10   			(0xC48)
-#define DOEPTSIZ10  			(0xC50)
-#define DOEPDMA10   			(0xC54)
-#define DOEPCTL11   			(0xC60)
-#define DOEPINT11   			(0xC68)
-#define DOEPTSIZ11  			(0xC70)
-#define DOEPDMA11   			(0xC74)
-#define DOEPCTL12   			(0xC80)
-#define DOEPINT12   			(0xC88)
-#define DOEPTSIZ12  			(0xC90)
-#define DOEPDMA12   			(0xC94)
-#define DOEPCTL13   			(0xCA0)
-#define DOEPINT13   			(0xCA8)
-#define DOEPTSIZ13  			(0xCB0)
-#define DOEPDMA13   			(0xCB4)
-#define DOEPCTL14   			(0xCC0)
-#define DOEPINT14   			(0xCC8)
-#define DOEPTSIZ14  			(0xCD0)
-#define DOEPDMA14   			(0xCD4)
-#define DOEPCTL15   			(0xCE0)
-#define DOEPINT15   			(0xCE8)
-#define DOEPTSIZ15  			(0xCF0)
-#define DOEPDMA15   			(0xCF4)
 
 /* Power and Clock Gating Register */
 #define PCGCCTL				(0xE00)
 
 #define EP0FIFO				(0x1000)
+
+#define USB_ENDPOINT_XFER_CONTROL       0
+#define USB_ENDPOINT_XFER_ISOC          1
+#define USB_ENDPOINT_XFER_BULK          2
+#define USB_ENDPOINT_XFER_INT           3
 
 /**
  * This union represents the bit fields in the DMA Descriptor
@@ -576,5 +473,62 @@ typedef struct dwc_otg_dev_dma_desc {
 	/** DMA Descriptor data buffer pointer */
 	UINT32 buf;
 } dwc_otg_dev_dma_desc_t;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+typedef struct _USB_OHCI_HC_DEV USB_OHCI_HC_DEV;
+
+struct _USB_OHCI_HC_DEV {
+  UINTN                     Signature;
+  EFI_USB_HC_PROTOCOL       UsbHc;
+  EFI_USB2_HC_PROTOCOL      Usb2Hc;
+  EFI_PCI_IO_PROTOCOL       *PciIo;
+  UINT64                    OriginalPciAttributes;
+
+//  HCCA_MEMORY_BLOCK         *HccaMemoryBlock;
+  VOID                      *HccaMemoryBuf;
+  VOID                      *HccaMemoryMapping;
+  UINTN                     HccaMemoryPages;
+
+//  ED_DESCRIPTOR             *IntervalList[6][32];
+//  INTERRUPT_CONTEXT_ENTRY   *InterruptContextList;
+  VOID                      *MemPool;
+
+  UINT32                    ToggleFlag;
+
+  EFI_EVENT                 HouseKeeperTimer;
+  //
+  // ExitBootServicesEvent is used to stop the OHC DMA operation
+  // after exit boot service.
+  //
+  EFI_EVENT                  ExitBootServiceEvent;
+
+  EFI_UNICODE_STRING_TABLE  *ControllerNameTable;
+
+  UINT32                    PortStatus;
+};
+
+#define USB_DW_HC_DEV_SIGNATURE     SIGNATURE_32('d','u','s','b')
+extern EFI_DRIVER_BINDING_PROTOCOL   gOhciDriverBinding;
+extern EFI_COMPONENT_NAME_PROTOCOL   gOhciComponentName;
+extern EFI_COMPONENT_NAME2_PROTOCOL  gOhciComponentName2;
+
+#define USB_OHCI_HC_DEV_FROM_THIS(a)    CR(a, USB_OHCI_HC_DEV, UsbHc, USB_DW_HC_DEV_SIGNATURE)
+#define USB2_OHCI_HC_DEV_FROM_THIS(a)    CR(a, USB_OHCI_HC_DEV, Usb2Hc, USB_DW_HC_DEV_SIGNATURE)
+
+
+
+
 
 #endif //ifndef __DW_USB_DXE_H__
