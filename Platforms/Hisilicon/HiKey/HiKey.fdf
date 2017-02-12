@@ -129,11 +129,21 @@ READ_LOCK_STATUS   = TRUE
   # USB Host Support
   #
   INF MdeModulePkg/Bus/Usb/UsbBusDxe/UsbBusDxe.inf
+  # INF OpenPlatformPkg/Drivers/Usb/DwUsbDxe/DwUsbDxe.inf
+  INF OpenPlatformPkg/Drivers/Usb/DwUsbHostDxe/DwUsbHostDxe.inf
+  INF OpenPlatformPkg/Drivers/Usb/DwNonPci/DwNonPciUsbDxe.inf
+  INF MdeModulePkg/Bus/Pci/NonDiscoverablePciDeviceDxe/NonDiscoverablePciDeviceDxe.inf
 
   #
   # USB Mass Storage Support
   #
   INF MdeModulePkg/Bus/Usb/UsbMassStorageDxe/UsbMassStorageDxe.inf
+
+  #
+  # USB Keyboard & Mouse
+  #
+  INF MdeModulePkg/Bus/Usb/UsbKbDxe/UsbKbDxe.inf
+  INF MdeModulePkg/Bus/Usb/UsbMouseDxe/UsbMouseDxe.inf
 
   #
   # USB Peripheral Support
@@ -189,6 +199,15 @@ READ_LOCK_STATUS   = TRUE
   INF MdeModulePkg/Universal/DisplayEngineDxe/DisplayEngineDxe.inf
   INF MdeModulePkg/Universal/BdsDxe/BdsDxe.inf
   INF MdeModulePkg/Application/UiApp/UiApp.inf
+
+  #
+  # FDT
+  #
+  INF OpenPlatformPkg/Platforms/Hisilicon/HiKey/Drivers/FdtDxe/FdtDxe.inf
+
+  FILE FREEFORM = PCD(gHiKeyTokenSpaceGuid.PcdHiKeyFdt) {
+    SECTION RAW = OpenPlatformPkg/Platforms/Hisilicon/HiKey/FdtBlob/hi6220-hikey.dtb
+  }
 
 [FV.FVMAIN_COMPACT]
 FvAlignment        = 8

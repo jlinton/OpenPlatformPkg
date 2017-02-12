@@ -109,6 +109,7 @@
   DmaLib|ArmPkg/Library/ArmDmaLib/ArmDmaLib.inf
 
   UncachedMemoryAllocationLib|ArmPkg/Library/UncachedMemoryAllocationLib/UncachedMemoryAllocationLib.inf
+  NonDiscoverableDeviceRegistrationLib|MdeModulePkg/Library/NonDiscoverableDeviceRegistrationLib/NonDiscoverableDeviceRegistrationLib.inf
 
   # Network Libraries
   UefiScsiLib|MdePkg/Library/UefiScsiLib/UefiScsiLib.inf
@@ -124,6 +125,8 @@
 
   # Add support for GCC stack protector
   NULL|MdePkg/Library/BaseStackCheckLib/BaseStackCheckLib.inf
+
+
 
 [LibraryClasses.common.SEC]
   PrePiLib|EmbeddedPkg/Library/PrePiLib/PrePiLib.inf
@@ -240,8 +243,10 @@
   #  DEBUG_EVENT     0x00080000  // Event messages
   #  DEBUG_GCD       0x00100000  // Global Coherency Database changes
   #  DEBUG_CACHE     0x00200000  // Memory range cachability changes
+  #  DEBUG_VERBOSE   0x00400000  // Detailed debug messages that may significantly impact boot performance
   #  DEBUG_ERROR     0x80000000  // Error
   gEfiMdePkgTokenSpaceGuid.PcdDebugPrintErrorLevel|0x8000000F
+#  gEfiMdePkgTokenSpaceGuid.PcdDebugPrintErrorLevel|0x8040000F
 
   gEfiMdePkgTokenSpaceGuid.PcdReportStatusCodePropertyMask|0x07
 
@@ -338,12 +343,26 @@
   gDwEmmcDxeTokenSpaceGuid.PcdDwEmmcDxeBaseAddress|0xF723D000
   gDwEmmcDxeTokenSpaceGuid.PcdDwEmmcDxeClockFrequencyInHz|100000000
 
+  # DW USB controller
+  #
+  gDwUsbDxeTokenSpaceGuid.PcdDwUsbBaseAddress|0xF72c0000
+  gDwUsbDxeTokenSpaceGuid.PcdDwUsbSysCtrlBaseAddress|0xF7030000
+
   #
   #
   # Fastboot
   #
   gEmbeddedTokenSpaceGuid.PcdAndroidFastbootUsbVendorId|0x18d1
   gEmbeddedTokenSpaceGuid.PcdAndroidFastbootUsbProductId|0xd00d
+
+#[PcdsDynamicDefault.common]
+  #
+  # The size of a dynamic PCD of the (VOID*) type can not be increased at run
+  # time from its size at build time. Set the "PcdFdtDevicePaths" PCD to a 128
+  # character "empty" string, to allow to be able to set FDT text device paths
+  # up to 128 characters long.
+  #
+#  gEmbeddedTokenSpaceGuid.PcdFdtDevicePaths|L"                                                                                                                                "
 
 ################################################################################
 #
@@ -407,11 +426,21 @@
   # USB Host Support
   #
   MdeModulePkg/Bus/Usb/UsbBusDxe/UsbBusDxe.inf
+  #OpenPlatformPkg/Drivers/Usb/DwUsbDxe/DwUsbDxe.inf
+  OpenPlatformPkg/Drivers/Usb/DwUsbHostDxe/DwUsbHostDxe.inf
+  OpenPlatformPkg/Drivers/Usb/DwNonPci/DwNonPciUsbDxe.inf
+  MdeModulePkg/Bus/Pci/NonDiscoverablePciDeviceDxe/NonDiscoverablePciDeviceDxe.inf
 
   #
   # USB Mass Storage Support
   #
   MdeModulePkg/Bus/Usb/UsbMassStorageDxe/UsbMassStorageDxe.inf
+
+  #
+  # USB Keyboard & Mouse
+  #
+  MdeModulePkg/Bus/Usb/UsbKbDxe/UsbKbDxe.inf
+  MdeModulePkg/Bus/Usb/UsbMouseDxe/UsbMouseDxe.inf
 
   #
   # USB Peripheral Support
@@ -486,3 +515,18 @@
       gEfiShellPkgTokenSpaceGuid.PcdShellLibAutoInitialize|FALSE
       gEfiMdePkgTokenSpaceGuid.PcdUefiLibMaxPrintBufferSize|8000
   }
+
+  #
+  # FDT
+  #
+  OpenPlatformPkg/Platforms/Hisilicon/HiKey/Drivers/FdtDxe/FdtDxe.inf {
+    <LibraryClasses>
+      # deprecated BdsLib from the ARM BDS
+      BdsLib|ArmPkg/Library/BdsLib/BdsLib.inf
+      FdtLib|EmbeddedPkg/Library/FdtLib/FdtLib.inf
+  }
+
+#  EmbeddedPkg/Drivers/FdtPlatformDxe/FdtPlatformDxe.inf {
+#    <LibraryClasses>
+#      BdsLib|ArmPkg/Library/BdsLib/BdsLib.inf
+#  }
