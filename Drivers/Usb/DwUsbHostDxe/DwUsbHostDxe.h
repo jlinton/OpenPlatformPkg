@@ -19,6 +19,10 @@
 
 #include <Uefi.h>
 
+#include <IndustryStandard/Pci.h>
+#include <IndustryStandard/Usb.h>
+
+#include <Protocol/PciIo.h>
 #include <Protocol/Usb2HostController.h>
 
 #include <Guid/EventGroup.h>
@@ -38,6 +42,7 @@
 #include <Library/IoLib.h>
 #include <Library/TimerLib.h>
 
+
 #define MAX_DEVICE                      16
 #define MAX_ENDPOINT                    16
 
@@ -45,6 +50,10 @@ typedef struct _DWUSB_OTGHC_DEV DWUSB_OTGHC_DEV;
 
 #define DWUSB_OTGHC_DEV_SIGNATURE	SIGNATURE_32 ('d', 'w', 'h', 'c')
 #define DWHC_FROM_THIS(a)		CR(a, DWUSB_OTGHC_DEV, DwUsbOtgHc, DWUSB_OTGHC_DEV_SIGNATURE)
+
+extern EFI_DRIVER_BINDING_PROTOCOL   gDwUsbDriverBinding;
+extern EFI_COMPONENT_NAME_PROTOCOL   gDwUsbComponentName;
+extern EFI_COMPONENT_NAME2_PROTOCOL  gDwUsbComponentName2;
 
 //
 // The RequestType in EFI_USB_DEVICE_REQUEST is composed of
@@ -77,7 +86,6 @@ struct _DWUSB_INTERRUPT_QUEUE {
     UINTN                                 MaximumPacketLength;
     EFI_USB2_HC_TRANSACTION_TRANSLATOR    *Translator;
 	UINT8                                 DataToggle;
-
 };
 
 struct _DWUSB_OTGHC_DEV {
@@ -93,8 +101,6 @@ struct _DWUSB_OTGHC_DEV {
 	EFI_EVENT			ExitBootServiceEvent;
 
 	UINT64				DwUsbBase;
-	UINT8				*StatusBuffer;
-	UINT8				*AlignedBuffer;
 
 	UINT16				PortStatus;
 	UINT16				PortChangeStatus;
@@ -103,6 +109,9 @@ struct _DWUSB_OTGHC_DEV {
 
 	EFI_EVENT           PollTimer; //interrupt transfers require an async response model, use a timer to send the query/callback
 	DWUSB_INTERRUPT_QUEUE *InterruptQueue; //the queue of interrupt transfer results
+	EFI_PCI_IO_PROTOCOL  *PciIo;
+	EFI_UNICODE_STRING_TABLE  *ControllerNameTable;
+	UINT32              BulkActive;
 };
 
 #endif //_DWUSBHOSTDXE_H_
