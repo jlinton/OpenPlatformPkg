@@ -51,14 +51,16 @@
 // likely needs to be synchronized in some manner, so speeding
 // it up likely will cause other problems (although I haven't seen anything)
 // Reasonable number for normal use.
-//#define DW_USB_POLL_TIMER EFI_TIMER_PERIOD_MILLISECONDS(200)
+#define DW_USB_POLL_TIMER EFI_TIMER_PERIOD_MILLISECONDS(20)
 // reasonable number for debugging
 //#define DW_USB_POLL_TIMER EFI_TIMER_PERIOD_MILLISECONDS(5000)
 // reasonable compromise
-#define DW_USB_POLL_TIMER EFI_TIMER_PERIOD_MILLISECONDS(1000)
+//#define DW_USB_POLL_TIMER EFI_TIMER_PERIOD_MILLISECONDS(1000)
+
 // How long to wait for an status change interrupt
 #define DW_USB_POLL_INTERRUPT 1000000 //1 second 
-
+//#define POLL_DELAY (EFI_TIMER_PERIOD_MILLISECONDS(5000)/DW_USB_POLL_TIMER)
+#define POLL_DELAY 100
 
 VOID DwHcInit (IN DWUSB_OTGHC_DEV *DwHc);
 VOID DwCoreInit (IN DWUSB_OTGHC_DEV *DwHc);
@@ -239,7 +241,8 @@ Wait4Chhltd (
 	IN UINT32   Channel,
     IN UINT32   *Sub,
     IN UINT32   *Toggle,
-    IN BOOLEAN    IgnoreAck
+    IN BOOLEAN   IgnoreAck,
+	IN BOOLEAN   IgnoreComplete
     )
 {
     UINT32  HcintCompHltAck = DWC2_HCINT_XFERCOMP | DWC2_HCINT_CHHLTD;
@@ -263,7 +266,12 @@ Wait4Chhltd (
         return EFI_USB_ERR_BABBLE;
     }   
     if (Hcint & DWC2_HCINT_FRMOVRUN) {
-        DEBUG ((EFI_D_ERROR, "Wait4Chhltd: Overrun Hcint=%X\n", Hcint));
+        DEBUG ((EFI_D_VERBOSE, "Wait4Chhltd: Overrun Hcint=%X\n", Hcint));
+        return EFI_USB_ERR_SYSTEM+1;
+    }
+
+    if (Hcint & DWC2_HCINT_XACTERR) {
+        DEBUG ((EFI_D_ERROR, "Wait4Chhltd: CRC/bitstuff/etc error Hcint=%X\n", Hcint));
         return EFI_USB_ERR_CRC;
     }
 
@@ -285,10 +293,16 @@ Wait4Chhltd (
         return EFI_USB_ERR_TIMEOUT;
     }
 
+	// A happy transfer is halted/complete/acked
+	// an ignore ack transaction is just complete/halted
     if (IgnoreAck)
         Hcint &= ~DWC2_HCINT_ACK;
     else
         HcintCompHltAck |= DWC2_HCINT_ACK;
+
+	if (IgnoreComplete)	{
+		Hcint |= DWC2_HCINT_XFERCOMP;
+	}
 
     if (Hcint != HcintCompHltAck) {
         DEBUG ((EFI_D_ERROR, "Wait4Chhltd: HCINT Error 0x%x\n", Hcint));
@@ -337,12 +351,6 @@ DwOtgHcInit (
 		Hcchar |= DWC2_HCCHAR_LSPDDEV;
 	}
 
-    //JL: slow the world down. Without this pretty much nothing 
-	// works if the debug prints are turned off. There is a long list
-	// of why this is. Starting with the complete lack of meaningful
-	// synchronization.
-//    MicroSecondDelay (5000); 
-
     DEBUG ((EFI_D_VERBOSE, "DwOtgHcInit \n",__func__));
 
     MmioWrite32 (DwHc->DwUsbBase + HCINT(Channel), 0x3FFF);
@@ -389,7 +397,8 @@ DwHcTransfer (
     IN     BOOLEAN    DoPing,
 	IN     UINT8      DeviceSpeed,
 	IN     UINT8      TtPort,
-	IN     UINT8      TtHub
+	IN     UINT8      TtHub,
+	IN     UINT8      IgnoreComplete
     )
 {
     UINT32                          TxferLen;
@@ -404,9 +413,13 @@ DwHcTransfer (
 	VOID                            *Mapping = NULL;
 	// picking a channel based on EP works in this driver but doesn't seem to afford andy
 	// advantages (at the moment).
-	UINT32                          Channel = (EpAddress & 0x7F) % DWC2_MAX_CHANNELS;
+//	UINT32                          Channel = (EpAddress & 0x7F) % DWC2_MAX_CHANNELS;
 	EFI_TPL                         OriginalTPL;				
-//		UINT32                          Channel = DWC2_HC_CHANNEL; //just use channel 0 for everything
+//	UINT32                          Channel = DWC2_HC_CHANNEL; //just use channel 0 for everything
+//	UINT32                          Channel = 0;
+
+	static UINT32                   StaticChannel = 0;
+	UINT32                          Channel = (StaticChannel++) % DWC2_MAX_CHANNELS;
     DEBUG ((EFI_D_VERBOSE, "DwHcTransfer channel=%d\n",Channel));
 
 	OriginalTPL = gBS->RaiseTPL(TPL_NOTIFY);
@@ -457,6 +470,11 @@ DwHcTransfer (
 			Status = DwHc->PciIo->Map (DwHc->PciIo, EfiPciIoOperationBusMasterRead , Data+Done , &BufferLen, &BusPhysAddr, &Mapping);
 		}
 
+		// something is horribly wrong with the way i'm binding the PciIo if this stabilizes 
+		// the transfers (and it removes nearly all the remaining stalls)
+		asm("dsb sy");
+		asm("isb sy");
+
 		if (EFI_ERROR (Status)) {
 				DEBUG ((EFI_D_ERROR, "Usb: Map DMA failed\n"));
 		}
@@ -469,14 +487,15 @@ DwHcTransfer (
                          ((1 << DWC2_HCCHAR_MULTICNT_OFFSET) |
                           DWC2_HCCHAR_CHEN));
 
-        *TransferResult = Wait4Chhltd (DwHc, Channel, &Sub, Pid, IgnoreAck);
+		//ArmDataSynchronizationBarrier();
+        *TransferResult = Wait4Chhltd (DwHc, Channel, &Sub, Pid, IgnoreAck, IgnoreComplete);
 		if ((DeviceSpeed != EFI_USB_SPEED_HIGH) && (!SplitDone) && (!DW_AT_FULLSPEED))
 		{
 			SplitDone++;
 			MmioWrite32 (DwHc->DwUsbBase + HCINT(Channel), 0x3FFF);
 			MmioAndThenOr32 (DwHc->DwUsbBase + HCCHAR(Channel), ~(DWC2_HCCHAR_MULTICNT_MASK | DWC2_HCCHAR_CHEN | DWC2_HCCHAR_CHDIS),
 							 ((1 << DWC2_HCCHAR_MULTICNT_OFFSET) | DWC2_HCCHAR_CHEN | DWC2_HCSPLT_COMPSPLT));
-			*TransferResult = Wait4Chhltd (DwHc, Channel, &Sub, Pid, IgnoreAck);
+			*TransferResult = Wait4Chhltd (DwHc, Channel, &Sub, Pid, IgnoreAck, IgnoreComplete);
 //						continue;
 		}
 
@@ -486,14 +505,14 @@ DwHcTransfer (
 			Mapping = NULL;
 		}
 
-        if (*TransferResult == EFI_USB_ERR_NAK ) {
+		/*  if (*TransferResult == EFI_USB_ERR_NAK ) {
             // NAK's are still successful transmission
             // particularly for interrupt transfers
             Status = EFI_USB_NOERROR;
             break;
-        }
+			}*/
         if (*TransferResult) {
-            DEBUG ((EFI_D_ERROR, "DwHcTransfer: failed\n"));
+            DEBUG ((EFI_D_VERBOSE, "DwHcTransfer: failed\n"));
             Status = EFI_DEVICE_ERROR;
             break;
         }
@@ -558,7 +577,7 @@ DwHcReset (
     )
 {
     DWUSB_OTGHC_DEV *DwHc;
-    DEBUG ((EFI_D_VERBOSE, "DwHcReset \n",__func__));
+    DEBUG ((EFI_D_ERROR, "DwHcReset \n",__func__));
 
     DwHc = DWHC_FROM_THIS (This);
 
@@ -956,7 +975,7 @@ DwHcControlTransfer (
     DwHc  = DWHC_FROM_THIS(This);
 
 	OriginalTPL = gBS->RaiseTPL(TPL_HIGH_LEVEL);
-	DwHc->BulkActive++;
+	DwHc->BulkActive=POLL_DELAY;
 	gBS->RestoreTPL (OriginalTPL);
 
     *TransferResult = EFI_USB_ERR_SYSTEM;
@@ -966,7 +985,7 @@ DwHcControlTransfer (
     Length = 8;
     Status = DwHcTransfer (DwHc, DeviceAddress, MaximumPacketLength, &Pid, 0, Request, &Length,
                            0, DWC2_HCCHAR_EPTYPE_CONTROL, TransferResult, 1, 0, DeviceSpeed, 
-						   Translator->TranslatorPortNumber, Translator->TranslatorHubAddress);
+						   Translator->TranslatorPortNumber, Translator->TranslatorHubAddress, 0);
 
     if (EFI_ERROR(Status)) {
         DEBUG ((EFI_D_ERROR, "DwHcControlTransfer: Setup Stage Error\n"));
@@ -983,7 +1002,7 @@ DwHcControlTransfer (
 
         Status = DwHcTransfer (DwHc, DeviceAddress, MaximumPacketLength, &Pid, Direction,
                                Data, DataLength, 0, DWC2_HCCHAR_EPTYPE_CONTROL, TransferResult, 0, 0, DeviceSpeed, 
-							   Translator->TranslatorPortNumber, Translator->TranslatorHubAddress);
+							   Translator->TranslatorPortNumber, Translator->TranslatorHubAddress, 0);
 
         if (EFI_ERROR(Status)) {
             DEBUG ((EFI_D_ERROR, "DwHcControlTransfer: Data Stage Error\n"));
@@ -1007,7 +1026,7 @@ DwHcControlTransfer (
 
     Status = DwHcTransfer (DwHc, DeviceAddress, MaximumPacketLength, &Pid, StatusDirection, StatusBuffer,
                            &Length, 0, DWC2_HCCHAR_EPTYPE_CONTROL, TransferResult, 0, 0, DeviceSpeed,
-						   Translator->TranslatorPortNumber, Translator->TranslatorHubAddress);
+						   Translator->TranslatorPortNumber, Translator->TranslatorHubAddress, 0);
 
     UncachedFreePages (StatusBuffer, EFI_SIZE_TO_PAGES (DWC2_STATUS_BUF_SIZE));
     if (EFI_ERROR(Status)) {
@@ -1071,14 +1090,17 @@ DwHcBulkTransfer (
 //    Ping    = TransferDirection; //for write do ping first
 
 	OriginalTPL = gBS->RaiseTPL(TPL_HIGH_LEVEL);
-	DwHc->BulkActive++;
+	DwHc->BulkActive=POLL_DELAY;
 	gBS->RestoreTPL (OriginalTPL);
 
     Status = DwHcTransfer (DwHc, DeviceAddress, MaximumPacketLength, &Pid, TransferDirection, Data[0], DataLength,
                            EpAddress, DWC2_HCCHAR_EPTYPE_BULK, TransferResult, 1, Ping, DeviceSpeed,
-						   Translator->TranslatorPortNumber, Translator->TranslatorHubAddress);
+						   Translator->TranslatorPortNumber, Translator->TranslatorHubAddress, 0);
 
     *DataToggle = (Pid >> 1);
+
+//    MicroSecondDelay (5000);
+//	DwHc->BulkActive=POLL_DELAY;
 
     return Status;
 }
@@ -1175,16 +1197,7 @@ DwHcAsyncInterruptTransfer (
 	CompletionEntry->Translator = Translator;
 
     Status      = EFI_SUCCESS;
-/*    EpAddress   = EndPointAddress & 0x0F;
-    TransferDirection = (EndPointAddress >> 7) & 0x01;
-    Pid         = (*DataToggle << 1);
 
-    Status = DwHcTransfer (DwHc, DeviceAddress, MaximumPacketLength, &Pid, TransferDirection, CompletionEntry->Data, &CompletionEntry->DataLength,
-                           EpAddress, DWC2_HCCHAR_EPTYPE_INTR, &CompletionEntry->TransferResult, 1, 0, DeviceSpeed,
-						   Translator->TranslatorPortNumber, Translator->TranslatorHubAddress);
-
-    *DataToggle = (Pid >> 1);
-	*/
 	CompletionEntry->DataToggle = *DataToggle;
 
 	DEBUG ((EFI_D_VERBOSE, "DwHcAsyncInterruptTransfer: Save off results of interrupt transfer\n"));
@@ -1307,11 +1320,11 @@ DwHcTimerCallback (
 	UINT32                   ret = 0;
 
 	OriginalTPL = gBS->RaiseTPL(TPL_HIGH_LEVEL);
-	if (DwHc->BulkActive) {
+	if (DwHc->BulkActive>0) {
 		// This is a gentle hack 
 		// to avoid colliding requests
 		// for now.
-		DwHc->BulkActive=0;
+		DwHc->BulkActive--;
 		ret = 1;
 	}
 	gBS->RestoreTPL (OriginalTPL);
@@ -1353,13 +1366,27 @@ DwHcTimerCallback (
 				Status = DwHcTransfer (DwHc, CompletionEntry->DeviceAddress, CompletionEntry->MaximumPacketLength, &Pid, TransferDirection, 
 									   CompletionEntry->Data, &DataLength,
 									   EpAddress, DWC2_HCCHAR_EPTYPE_INTR, &CompletionEntry->TransferResult, 1, 0, CompletionEntry->DeviceSpeed,
-									   Translator->TranslatorPortNumber, Translator->TranslatorHubAddress);
+									   Translator->TranslatorPortNumber, Translator->TranslatorHubAddress, 1);
 
 				CompletionEntry->DataToggle = (Pid >> 1);
 				
 				if (EFI_ERROR(Status))
 				{
-					DEBUG ((EFI_D_ERROR, "Consider canceling the transaction here?\n"));
+					//DEBUG ((EFI_D_ERROR, "Consider canceling the transaction here?\n"));
+					if (CompletionEntry->TransferResult == EFI_USB_ERR_NAK ) {
+						// NAK's are still successful transmission
+						// particularly for interrupt transfers
+						Status = EFI_USB_NOERROR;
+					}
+
+					if (CompletionEntry->TransferResult == (EFI_USB_ERR_SYSTEM+1) ) {
+						// overruns may still have data, lets pass it on
+//						DataLength = CompletionEntry->DataLength;
+//						CompletionEntry->DataLength++;
+						Status = EFI_USB_NOERROR;
+//						CompletionEntry->TransferResult = EFI_USB_NOERROR;
+					}
+
 				}
 				
 				if (CompletionEntry->TransferResult != EFI_USB_ERR_SYSTEM) //DATA toggle?
