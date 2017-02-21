@@ -340,8 +340,14 @@
   #
   # DW MMC/SD card controller
   #
+  #  This describes the onboard fixed MMC, which we should 
+  #  really be hiding from linux/etc
   gDwEmmcDxeTokenSpaceGuid.PcdDwEmmcDxeBaseAddress|0xF723D000
   gDwEmmcDxeTokenSpaceGuid.PcdDwEmmcDxeClockFrequencyInHz|100000000
+  #  We want the SD slot, so we can put a decent amount of storage on it
+  #  also we don't want to worry about blowing up the firmware
+  gDwSdDxeTokenSpaceGuid.PcdDwSdBaseAddress|0xF723E000
+  gDwSdDxeTokenSpaceGuid.PcdDwSdClockFrequencyInHz|24000000
 
   # DW USB controller
   #
@@ -421,6 +427,7 @@
   #
   EmbeddedPkg/Universal/MmcDxe/MmcDxe.inf
   OpenPlatformPkg/Drivers/Mmc/DwEmmcDxe/DwEmmcDxe.inf
+  OpenPlatformPkg/Drivers/SdMmc/DwSdDxe/DwSdDxe.inf
 
   #
   # USB Host Support
