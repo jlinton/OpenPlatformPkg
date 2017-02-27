@@ -247,6 +247,7 @@
   #  DEBUG_ERROR     0x80000000  // Error
   gEfiMdePkgTokenSpaceGuid.PcdDebugPrintErrorLevel|0x8000000F
 #  gEfiMdePkgTokenSpaceGuid.PcdDebugPrintErrorLevel|0x8040000F
+#  gEfiMdePkgTokenSpaceGuid.PcdDebugPrintErrorLevel|0x8FFFFFFF
 
   gEfiMdePkgTokenSpaceGuid.PcdReportStatusCodePropertyMask|0x07
 
@@ -532,8 +533,3 @@
       BdsLib|ArmPkg/Library/BdsLib/BdsLib.inf
       FdtLib|EmbeddedPkg/Library/FdtLib/FdtLib.inf
   }
-
-#  EmbeddedPkg/Drivers/FdtPlatformDxe/FdtPlatformDxe.inf {
-#    <LibraryClasses>
-#      BdsLib|ArmPkg/Library/BdsLib/BdsLib.inf
-#  }
