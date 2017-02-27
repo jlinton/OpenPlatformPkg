@@ -42,25 +42,26 @@
 
 // Enabling this, disables attempting split transactions, and 
 // sets the initial root port to full speed (rather than high)
-#define DW_AT_FULLSPEED 1
+#define DW_AT_FULLSPEED 0
 // Forcing host mode may allow HS/FS/LS devices? Nah, doesn't 
 // appear that way on the HiSi, but do it anyway for the time.
 #define DW_FORCE_HOST   1 
-// slow the polling down for development purposes so that 
-// we can see whats happening. Although the callback system
-// likely needs to be synchronized in some manner, so speeding
-// it up likely will cause other problems (although I haven't seen anything)
-// Reasonable number for normal use.
-#define DW_USB_POLL_TIMER EFI_TIMER_PERIOD_MILLISECONDS(20)
-// reasonable number for debugging
-//#define DW_USB_POLL_TIMER EFI_TIMER_PERIOD_MILLISECONDS(5000)
-// reasonable compromise
-//#define DW_USB_POLL_TIMER EFI_TIMER_PERIOD_MILLISECONDS(1000)
 
-// How long to wait for an status change interrupt
-#define DW_USB_POLL_INTERRUPT 1000000 //1 second 
-//#define POLL_DELAY (EFI_TIMER_PERIOD_MILLISECONDS(5000)/DW_USB_POLL_TIMER)
-#define POLL_DELAY 100
+// slow the polling down for development purposes so that 
+// we can see whats happening. 
+// This timer controls how frequently we wake up to service
+// interrupt transfers (in milliseconds). 
+#define DW_USB_POLL_TIMER 10
+
+// timeout for interrupt transfers
+#define DW_USB_POLL_INTERRUPT   100 //100 ms
+// We delay ops for a few poll intervals following bulk transfers
+// in a lame (non USB standard) way to avoid burning bandwidth
+// on interrupt transfers if bulk/setup is active. This also
+// avoids colliding interrupts with bulk transfers although this
+// seems to work fine now.
+#define POLL_DELAY 10
+
 
 VOID DwHcInit (IN DWUSB_OTGHC_DEV *DwHc);
 VOID DwCoreInit (IN DWUSB_OTGHC_DEV *DwHc);
@@ -135,7 +136,7 @@ Wait4Bit (
         MicroSecondDelay (1);
     }
 
-    DEBUG ((EFI_D_ERROR, "Wait4Bit: Timeout (Reg:0x%x, mask:0x%x, wait_set:%d, val:0x%X)\n", Reg, Mask, Set, Value));
+//    DEBUG ((EFI_D_ERROR, "Wait4Bit: Timeout (Reg:0x%x, mask:0x%x, wait_set:%d, val:0x%X)\n", Reg, Mask, Set, Value));
 
     return 1;
 }
@@ -145,11 +146,12 @@ UINT32
 Wait4AnyBit (
     IN UINT32     Reg,
     IN UINT32     Mask,
-	IN UINT32     MaskFail
+	IN UINT32     MaskFail,
+	IN UINT32     Timeout // in milliseconds
     )
 {
-    UINT32  Timeout = DW_USB_POLL_INTERRUPT;
     UINT32  Value;
+	Timeout *= 1000; // we want this in microseconds
     DEBUG ((EFI_D_VERBOSE, "Wait4AnyBit \n"));
 
     while (--Timeout) {
@@ -165,17 +167,20 @@ Wait4AnyBit (
 			return 0;
 		}
 
-
-
         MicroSecondDelay (1);
     }
 
-    DEBUG ((EFI_D_ERROR, "Wait4AnyBit: Timeout (Reg:0x%x, mask:0x%x, val:0x%X)\n", Reg, Mask, Value));
+    DEBUG ((EFI_D_VERBOSE, "Wait4AnyBit: Timeout (Reg:0x%x, mask:0x%x, val:0x%X)\n", Reg, Mask, Value));
 
     return 1;
 }
 
 
+// The Num parameter corresponds to the FIFO being flushed
+//  0000 Non periodic TX FIFO in host mode
+//  0001 Periodic FIFO host mode
+//  xxx0 Device mode FIFO
+// 10000 Flush all transmit FIFOs
 VOID
 DwFlushTxFifo (
     IN DWUSB_OTGHC_DEV *DwHc,
@@ -221,7 +226,7 @@ void DwUsbAttemptClear(
 					 ~(DWC2_HCCHAR_CHEN | DWC2_HCCHAR_EPDIR),
 					 DWC2_HCCHAR_CHDIS);
 
-    DwFlushTxFifo (DwHc, 0x10);
+    DwFlushTxFifo (DwHc, 0x00); //flush non periodic queue
     DwFlushRxFifo (DwHc);
 
     MicroSecondDelay (50000);	
@@ -242,7 +247,8 @@ Wait4Chhltd (
     IN UINT32   *Sub,
     IN UINT32   *Toggle,
     IN BOOLEAN   IgnoreAck,
-	IN BOOLEAN   IgnoreComplete
+	IN BOOLEAN   IgnoreComplete,
+	IN UINT32    Timeout
     )
 {
     UINT32  HcintCompHltAck = DWC2_HCINT_XFERCOMP | DWC2_HCINT_CHHLTD;
@@ -252,7 +258,10 @@ Wait4Chhltd (
 
     MicroSecondDelay (100);
 //    Ret = Wait4Bit (DwHc->DwUsbBase + HCINT(Channel), DWC2_HCINT_CHHLTD, 1); //wait only for channel halt, cosider waiting for NAK/STALL too....
-    Ret = Wait4AnyBit (DwHc->DwUsbBase + HCINT(Channel), DWC2_HCINT_CHHLTD, DWC2_HCINT_NAK|DWC2_HCINT_STALL); //wait for channel halt or nak
+
+//    Ret = Wait4AnyBit (DwHc->DwUsbBase + HCINT(Channel), DWC2_HCINT_CHHLTD|DWC2_HCINT_XFERCOMP, DWC2_HCINT_NAK|DWC2_HCINT_STALL); //Ok really the sequence should be wait for complete
+	// then halt the channel and wait for channel halt
+	Ret = Wait4AnyBit (DwHc->DwUsbBase + HCINT(Channel), DWC2_HCINT_CHHLTD, DWC2_HCINT_NAK|DWC2_HCINT_STALL, Timeout); //for whatever reason just waiting for halt tends to work
 
     MicroSecondDelay (100);
     Hcint = MmioRead32 (DwHc->DwUsbBase + HCINT(Channel));
@@ -289,7 +298,8 @@ Wait4Chhltd (
     // Moved this down here so that NAK & other error conditions are 
     // handled before timeout
     if (Ret) {
-        DEBUG ((EFI_D_ERROR, "Wait4Chhltd ret\n"));
+        DEBUG ((EFI_D_VERBOSE, "Wait4Chhltd ret\n"));
+		DwUsbAttemptClear(DwHc, Channel);
         return EFI_USB_ERR_TIMEOUT;
     }
 
@@ -345,6 +355,9 @@ DwOtgHcInit (
 		Split |= DWC2_HCSPLT_XACTPOS_ALL << DWC2_HCSPLT_XACTPOS_OFFSET;
 		Split |= DoComplete?DWC2_HCSPLT_COMPSPLT:0;
 		Split |= DWC2_HCSPLT_SPLTENA;
+		// Do we need to set lowspeed? I'm guessing this is only when the root port is full/low
+		// because the "speed" of a split transaction is still high to the TT..
+		//Hcchar |= DWC2_HCCHAR_LSPDDEV;
 	} 
 	else if (DeviceSpeed == EFI_USB_SPEED_LOW)
 	{
@@ -388,7 +401,7 @@ DwHcTransfer (
     IN     UINTN      MaximumPacketLength,
     IN OUT UINT32     *Pid,
     IN     UINT32     TransferDirection,
-    IN OUT VOID     *Data,
+    IN OUT VOID       *Data,
     IN OUT UINTN      *DataLength,
     IN     UINT32     EpAddress,
     IN     UINT32     EpType,
@@ -398,7 +411,8 @@ DwHcTransfer (
 	IN     UINT8      DeviceSpeed,
 	IN     UINT8      TtPort,
 	IN     UINT8      TtHub,
-	IN     UINT8      IgnoreComplete
+	IN     UINT8      IgnoreComplete,
+	IN     UINT32     Timeout
     )
 {
     UINT32                          TxferLen;
@@ -420,7 +434,30 @@ DwHcTransfer (
 
 	static UINT32                   StaticChannel = 0;
 	UINT32                          Channel = (StaticChannel++) % DWC2_MAX_CHANNELS;
-    DEBUG ((EFI_D_VERBOSE, "DwHcTransfer channel=%d\n",Channel));
+	UINT32                          ChannelRetries = DWC2_MAX_CHANNELS;
+
+	OriginalTPL = gBS->RaiseTPL(TPL_HIGH_LEVEL);    
+	for (ChannelRetries = 0 ; ChannelRetries < DWC2_MAX_CHANNELS; ChannelRetries++)
+	{
+		if (DwHc->ActiveChannel[Channel])
+		{
+			Channel++;
+			DEBUG ((EFI_D_ERROR, "DwHcTransfer: Channel Collision\n"));
+		}
+		else
+		{
+			DwHc->ActiveChannel[Channel] = TRUE;
+			break;
+		}
+	}
+	gBS->RestoreTPL (OriginalTPL);
+
+	if (ChannelRetries == DWC2_MAX_CHANNELS)
+	{
+		DEBUG ((EFI_D_ERROR, "DwHcTransfer: Out of channels\n"));
+	}
+ 	DEBUG ((EFI_D_VERBOSE, "DwHcTransfer channel=%d\n",Channel));
+
 
 	OriginalTPL = gBS->RaiseTPL(TPL_NOTIFY);
 
@@ -487,15 +524,16 @@ DwHcTransfer (
                          ((1 << DWC2_HCCHAR_MULTICNT_OFFSET) |
                           DWC2_HCCHAR_CHEN));
 
-		//ArmDataSynchronizationBarrier();
-        *TransferResult = Wait4Chhltd (DwHc, Channel, &Sub, Pid, IgnoreAck, IgnoreComplete);
+//		ArmDataSynchronizationBarrier();
+
+        *TransferResult = Wait4Chhltd (DwHc, Channel, &Sub, Pid, IgnoreAck, IgnoreComplete, Timeout);
 		if ((DeviceSpeed != EFI_USB_SPEED_HIGH) && (!SplitDone) && (!DW_AT_FULLSPEED))
 		{
 			SplitDone++;
 			MmioWrite32 (DwHc->DwUsbBase + HCINT(Channel), 0x3FFF);
 			MmioAndThenOr32 (DwHc->DwUsbBase + HCCHAR(Channel), ~(DWC2_HCCHAR_MULTICNT_MASK | DWC2_HCCHAR_CHEN | DWC2_HCCHAR_CHDIS),
 							 ((1 << DWC2_HCCHAR_MULTICNT_OFFSET) | DWC2_HCCHAR_CHEN | DWC2_HCSPLT_COMPSPLT));
-			*TransferResult = Wait4Chhltd (DwHc, Channel, &Sub, Pid, IgnoreAck, IgnoreComplete);
+			*TransferResult = Wait4Chhltd (DwHc, Channel, &Sub, Pid, IgnoreAck, IgnoreComplete, Timeout);
 //						continue;
 		}
 
@@ -532,6 +570,10 @@ DwHcTransfer (
 
     *DataLength = Done;
 
+	gBS->RestoreTPL (OriginalTPL);
+
+	OriginalTPL = gBS->RaiseTPL(TPL_HIGH_LEVEL);    
+	DwHc->ActiveChannel[Channel] = FALSE;
 	gBS->RestoreTPL (OriginalTPL);
 
     return Status;
@@ -646,14 +688,14 @@ DwHcGetRootHubPortStatus (
     UINT32    Hprt0;
     static    int first = 1;
 //  DEBUG ((EFI_D_ERROR, "%s \n",L __func__));
-//  DEBUG ((EFI_D_ERROR, "GetPortStatus \n"));
+//    DEBUG ((EFI_D_ERROR, "GetPortStatus \n"));
 
     if (first)
     {
         first = 0 ;
+		DEBUG ((EFI_D_ERROR, "DwHcReset first \n"));
         DwHcReset(This,0);
     }
-
 
     if (PortNumber > DWC2_HC_CHANNEL)
         return EFI_INVALID_PARAMETER;
@@ -665,6 +707,7 @@ DwHcGetRootHubPortStatus (
 
     PortStatus->PortStatus = 0;
     PortStatus->PortChangeStatus = 0;
+
     Hprt0 = MmioRead32 (DwHc->DwUsbBase + HPRT0);
 
     if (Hprt0 & DWC2_HPRT0_PRTCONNSTS) {
@@ -725,7 +768,7 @@ DwHcSetRootHubPortFeature (
     UINT32      Hprt0;
     EFI_STATUS    Status = EFI_SUCCESS;
 
-    DEBUG ((EFI_D_VERBOSE, "DwHcSetRootHubPortFeature \n",__func__));
+    DEBUG ((EFI_D_ERROR, "DwHcSetRootHubPortFeature \n"));
 
     if (PortNumber > DWC2_HC_CHANNEL) {
         Status = EFI_INVALID_PARAMETER;
@@ -782,7 +825,7 @@ DwHcClearRootHubPortFeature (
     UINT32      Hprt0;
     EFI_STATUS    Status = EFI_SUCCESS;
 
-    DEBUG ((EFI_D_VERBOSE, "DwHcClearRootHubPortFeature \n",__func__));
+    DEBUG ((EFI_D_ERROR, "DwHcClearRootHubPortFeature \n"));
 
     if (PortNumber > DWC2_HC_CHANNEL) {
         Status = EFI_INVALID_PARAMETER;
@@ -985,7 +1028,7 @@ DwHcControlTransfer (
     Length = 8;
     Status = DwHcTransfer (DwHc, DeviceAddress, MaximumPacketLength, &Pid, 0, Request, &Length,
                            0, DWC2_HCCHAR_EPTYPE_CONTROL, TransferResult, 1, 0, DeviceSpeed, 
-						   Translator->TranslatorPortNumber, Translator->TranslatorHubAddress, 0);
+						   Translator->TranslatorPortNumber, Translator->TranslatorHubAddress, 0, TimeOut);
 
     if (EFI_ERROR(Status)) {
         DEBUG ((EFI_D_ERROR, "DwHcControlTransfer: Setup Stage Error\n"));
@@ -1002,7 +1045,7 @@ DwHcControlTransfer (
 
         Status = DwHcTransfer (DwHc, DeviceAddress, MaximumPacketLength, &Pid, Direction,
                                Data, DataLength, 0, DWC2_HCCHAR_EPTYPE_CONTROL, TransferResult, 0, 0, DeviceSpeed, 
-							   Translator->TranslatorPortNumber, Translator->TranslatorHubAddress, 0);
+							   Translator->TranslatorPortNumber, Translator->TranslatorHubAddress, 0, TimeOut);
 
         if (EFI_ERROR(Status)) {
             DEBUG ((EFI_D_ERROR, "DwHcControlTransfer: Data Stage Error\n"));
@@ -1026,7 +1069,7 @@ DwHcControlTransfer (
 
     Status = DwHcTransfer (DwHc, DeviceAddress, MaximumPacketLength, &Pid, StatusDirection, StatusBuffer,
                            &Length, 0, DWC2_HCCHAR_EPTYPE_CONTROL, TransferResult, 0, 0, DeviceSpeed,
-						   Translator->TranslatorPortNumber, Translator->TranslatorHubAddress, 0);
+						   Translator->TranslatorPortNumber, Translator->TranslatorHubAddress, 0, TimeOut);
 
     UncachedFreePages (StatusBuffer, EFI_SIZE_TO_PAGES (DWC2_STATUS_BUF_SIZE));
     if (EFI_ERROR(Status)) {
@@ -1095,7 +1138,7 @@ DwHcBulkTransfer (
 
     Status = DwHcTransfer (DwHc, DeviceAddress, MaximumPacketLength, &Pid, TransferDirection, Data[0], DataLength,
                            EpAddress, DWC2_HCCHAR_EPTYPE_BULK, TransferResult, 1, Ping, DeviceSpeed,
-						   Translator->TranslatorPortNumber, Translator->TranslatorHubAddress, 0);
+						   Translator->TranslatorPortNumber, Translator->TranslatorHubAddress, 0, TimeOut);
 
     *DataToggle = (Pid >> 1);
 
@@ -1126,7 +1169,7 @@ DwHcAsyncInterruptTransfer (
     EFI_STATUS            Status;
 	EFI_TPL               OriginalTPL;				
 	DWUSB_INTERRUPT_QUEUE *CompletionEntry;
-    DEBUG ((EFI_D_VERBOSE, "DwHcAsyncInterruptTransfer Addr=%d, EP=%d len=%d new=%d\n",DeviceAddress, EndPointAddress, DataLength, IsNewTransfer));
+    DEBUG ((EFI_D_VERBOSE, "DwHcAsyncInterruptTransfer Addr=%d, EP=%d len=%d new=%d Interval=%d(%d)\n",DeviceAddress, EndPointAddress, DataLength, IsNewTransfer, PollingInterval, PollingInterval/DW_USB_POLL_TIMER));
 
     if (!(EndPointAddress & USB_ENDPOINT_DIR_IN)) {
         DEBUG ((EFI_D_ERROR, "DwHcAsyncInterruptTransfer: endpoint direction not right\n"));
@@ -1195,6 +1238,8 @@ DwHcAsyncInterruptTransfer (
 	CompletionEntry->DeviceSpeed = DeviceSpeed;
 	CompletionEntry->MaximumPacketLength = MaximumPacketLength;
 	CompletionEntry->Translator = Translator;
+	CompletionEntry->TicksBeforeActive = PollingInterval/DW_USB_POLL_TIMER;
+	CompletionEntry->Ticks = 0;
 
     Status      = EFI_SUCCESS;
 
@@ -1332,6 +1377,8 @@ DwHcTimerCallback (
 	if (ret)
 		return;
 
+//	DEBUG ((EFI_D_ERROR, "DwHcTimerCallback TPL=%dn\n",OriginalTPL));
+
 	// pick off all queued items.
 	OriginalTPL = gBS->RaiseTPL(TPL_HIGH_LEVEL);
 	CompletionNext = DwHc->InterruptQueue;
@@ -1343,15 +1390,24 @@ DwHcTimerCallback (
 		DEBUG ((EFI_D_VERBOSE, "DwHcTimerCallbackn\n"));
 		CompletionEntry = CompletionNext;
 		CompletionNext = CompletionEntry->Next;
-		if ((CompletionEntry->CallBackFunction) && ( CompletionEntry->Cancel == 0 ))
+		CompletionEntry->Ticks++;
+		if ((CompletionEntry->CallBackFunction) && ( CompletionEntry->Cancel == 0 ) && (CompletionEntry->Ticks > CompletionEntry->TicksBeforeActive))
 		{
 			UINT32        Pid;
 			UINT8         TransferDirection;
 			UINT8         EpAddress;
 			EFI_STATUS    Status;
 			EFI_USB2_HC_TRANSACTION_TRANSLATOR    *Translator = CompletionEntry->Translator;
-			int           Retry = 2;
+			int           Retry = 1;
 			UINTN         DataLength;
+			UINT32        Timeout = DW_USB_POLL_INTERRUPT;
+			
+			if ( CompletionEntry->DeviceAddress == 1 )
+			{
+				// fast timeouts on first hub port
+				Timeout = 10;
+				DEBUG ((EFI_D_VERBOSE, "DwHcTimerCallbackn Reset timer for addr1\n"));
+			}
 
 			while (Retry) {
 				Retry--;
@@ -1359,16 +1415,17 @@ DwHcTimerCallback (
 				EpAddress   = CompletionEntry->EndPointAddress & 0x0F;
 				TransferDirection = (CompletionEntry->EndPointAddress >> 7) & 0x01;
 								
-				Pid         = (CompletionEntry->DataToggle << 1);	
+				Pid         = (CompletionEntry->DataToggle) << 1;	
 				DataLength  = CompletionEntry->DataLength;
 				
+				DEBUG ((EFI_D_VERBOSE, "DwHcTimerCallback message to  addr=%d, EP=%d\n",CompletionEntry->DeviceAddress, EpAddress));
 
 				Status = DwHcTransfer (DwHc, CompletionEntry->DeviceAddress, CompletionEntry->MaximumPacketLength, &Pid, TransferDirection, 
 									   CompletionEntry->Data, &DataLength,
 									   EpAddress, DWC2_HCCHAR_EPTYPE_INTR, &CompletionEntry->TransferResult, 1, 0, CompletionEntry->DeviceSpeed,
-									   Translator->TranslatorPortNumber, Translator->TranslatorHubAddress, 1);
+									   Translator->TranslatorPortNumber, Translator->TranslatorHubAddress, 1, Timeout);
 
-				CompletionEntry->DataToggle = (Pid >> 1);
+				(CompletionEntry->DataToggle) = Pid >> 1;
 				
 				if (EFI_ERROR(Status))
 				{
@@ -1381,10 +1438,17 @@ DwHcTimerCallback (
 
 					if (CompletionEntry->TransferResult == (EFI_USB_ERR_SYSTEM+1) ) {
 						// overruns may still have data, lets pass it on
-//						DataLength = CompletionEntry->DataLength;
-//						CompletionEntry->DataLength++;
 						Status = EFI_USB_NOERROR;
-//						CompletionEntry->TransferResult = EFI_USB_NOERROR;
+						//DataLength = CompletionEntry->DataLength;
+						//CompletionEntry->TransferResult = EFI_USB_NOERROR;
+					}
+					if (CompletionEntry->TransferResult == EFI_USB_ERR_TIMEOUT)
+					{
+						// This actually appears to recovery everything correctly
+						// but does it really need recovery, or just a retry?
+						//DEBUG ((EFI_D_ERROR, "Doing full reset\n"));
+						// doing full reset
+						DwHcReset(CompletionEntry->This,0);
 					}
 
 				}
@@ -1393,36 +1457,18 @@ DwHcTimerCallback (
 				{
 					break;
 				}
+				// data toggle error do it again (this destabilizes the whole mess)
+				//(*CompletionEntry->DataToggle) = ++Pid >> 1;
 			}
 			
 
 			CompletionEntry->CallBackFunction (CompletionEntry->Data, DataLength, CompletionEntry->Context, CompletionEntry->TransferResult);
-/*			if ( && (!EFI_ERROR(CompletionEntry->TransferResult)))
-			{
-				// Here comes the evil...
-				// TODO, we need to reschedule this IO, so copy the rest of the parms
-				// and make another queue call, at that point though me might as well do
-				// this the right way.
-				DEBUG ((EFI_D_ERROR, "DwHcTimerCallbackn2\n"));
-				UINT8  DataToggle = (CompletionEntry->DataToggle++); //this will likely cause problems...
-				int retry = 1; 
-				EFI_STATUS Status;
-				while (retry)	{
-					DEBUG ((EFI_D_ERROR, "DwHcTimerCallbackn3\n"));
-					Status = DwHcAsyncInterruptTransfer (CompletionEntry->This, CompletionEntry->DeviceAddress, CompletionEntry->EndPointAddress, CompletionEntry->DeviceSpeed,
-														 CompletionEntry->MaximumPacketLength, 1, &DataToggle, 1, CompletionEntry->OriginalDataLen, CompletionEntry->Translator,
-														 CompletionEntry->CallBackFunction, CompletionEntry->Context);
-					if (!EFI_ERROR(Status)) {
-						break;
-					}
-					// Likely data toggle or something similar
-					retry --;
-				}
-				}*/
+			CompletionEntry->Ticks = 0; //reset the ticks
 		}
 	}
 
 	{
+		// Nove canceled items to a cancel list
 		DWUSB_INTERRUPT_QUEUE *Canceled;
 		// now remove any canceled entries
 		OriginalTPL = gBS->RaiseTPL(TPL_HIGH_LEVEL);
@@ -1555,13 +1601,17 @@ DwCoreInit (
 	if (DW_FORCE_HOST) {
 		UsbCfg |= DWC2_GUSBCFG_FORCEHOSTMODE; 
 	}
+    UsbCfg &= ~(DWC2_GUSBCFG_HNPCAP | DWC2_GUSBCFG_SRPCAP); //disable host neg protocol and SRP
     MmioWrite32 (DwHc->DwUsbBase + GUSBCFG, UsbCfg);
+
+    DEBUG ((EFI_D_ERROR, "DwCoreInit USB cfg %X\n",UsbCfg));
 
     AhbCfg |= DWC2_GAHBCFG_HBURSTLEN_INCR4;
     AhbCfg |= DWC2_GAHBCFG_DMAENABLE;
 
     MmioWrite32 (DwHc->DwUsbBase + GAHBCFG, AhbCfg);
-    MmioOr32 (DwHc->DwUsbBase + GUSBCFG, DWC2_GUSBCFG_HNPCAP | DWC2_GUSBCFG_SRPCAP);
+//    MmioOr32 (DwHc->DwUsbBase + GUSBCFG, DWC2_GUSBCFG_HNPCAP | DWC2_GUSBCFG_SRPCAP); //enable host negotiation, and session request (not wanted for host mode)
+
 }
 
 DWUSB_OTGHC_DEV *
@@ -1570,6 +1620,7 @@ CreateDwUsbHc (
     )
 {
     DWUSB_OTGHC_DEV *DwHc;
+	UINT32  Channel;
     DEBUG ((EFI_D_VERBOSE, "CreateDwUsbHc \n",__func__));
 
     DwHc = AllocateZeroPool (sizeof(DWUSB_OTGHC_DEV));
@@ -1600,6 +1651,12 @@ CreateDwUsbHc (
 	DwHc->PciIo = PciIo;
 	DwHc->BulkActive = 0;
 
+	for (Channel = 0 ; Channel < DWC2_MAX_CHANNELS; Channel++)
+	{
+		DwHc->ActiveChannel[Channel] = FALSE;
+	}
+
+
     return DwHc;
 }
 
@@ -1611,6 +1668,8 @@ DwUsbHcExitBootService (
     )
 {
     DWUSB_OTGHC_DEV   *DwHc;
+	
+	DEBUG ((EFI_D_ERROR, "\n\n\nEXIT BOOT SERVICES!\n\n\n"));
 
     DwHc = (DWUSB_OTGHC_DEV *) Context;
 
@@ -1623,98 +1682,6 @@ DwUsbHcExitBootService (
 
     DwCoreReset (DwHc);
 }
-
-/**
-   UEFI Driver Entry Point API
-
-   @param  ImageHandle       EFI_HANDLE.
-   @param  SystemTable       EFI_SYSTEM_TABLE.
-
-   @return EFI_SUCCESS       Success.
-   EFI_DEVICE_ERROR  Fail.
-**/
-
-#ifdef NOTHING
-EFI_STATUS
-EFIAPI
-DwUsbHostEntryPoint2 (
-    IN EFI_HANDLE           ImageHandle,
-    IN EFI_SYSTEM_TABLE     *SystemTable
-    )
-{
-    EFI_STATUS                      Status;
-    DWUSB_OTGHC_DEV                 *DwHc;
-    DEBUG ((EFI_D_VERBOSE, "DwUsbHostEntryPoint \n",__func__));
-
-    Status = EFI_SUCCESS;
-
-    DwHc = CreateDwUsbHc ();
-    if (DwHc == NULL) {
-        Status = EFI_OUT_OF_RESOURCES;
-        goto EXIT;
-    }
-
-
-
-    Status = gBS->InstallMultipleProtocolInterfaces (
-        &DwHc->DeviceHandle,
-        &gEfiUsb2HcProtocolGuid,  &DwHc->DwUsbOtgHc,
-        &gEfiDevicePathProtocolGuid,  &DwHc->DevicePath,
-        NULL
-        );
-
-    if (EFI_ERROR (Status)) {
-        goto FREE_DWUSBHC;
-    }
-
-    Status = gBS->CreateEventEx (
-        EVT_NOTIFY_SIGNAL,
-        TPL_NOTIFY,
-        DwUsbHcExitBootService,
-        DwHc,
-        &gEfiEventExitBootServicesGuid,
-        &DwHc->ExitBootServiceEvent
-        );
-
-    if (EFI_ERROR (Status)) {
-        goto UNINSTALL_PROTOCOL;
-    }
-
-	//
-	// Start the asynchronous interrupt monitor
-	//
-	Status = gBS->CreateEvent (
-		EVT_TIMER | EVT_NOTIFY_SIGNAL,
-		TPL_NOTIFY,
-		DwHcTimerCallback,
-		DwHc,
-		&DwHc->PollTimer
-		);
-	if (EFI_ERROR (Status)) {
-		DEBUG ((EFI_D_ERROR, "Failed to register DwUsbHostDxe Timer\n"));				
-	}
-
-	Status = gBS->SetTimer (DwHc->PollTimer, TimerPeriodic, DW_USB_POLL_TIMER);
-	if (EFI_ERROR (Status)) {
-		DEBUG ((EFI_D_ERROR, "Failed to enable DwUsbHostDxe Timer\n"));				
-	}
-
-
-    return Status;
-
-  UNINSTALL_PROTOCOL:
-    gBS->UninstallMultipleProtocolInterfaces (
-        &DwHc->DeviceHandle,
-        &gEfiUsb2HcProtocolGuid,  &DwHc->DwUsbOtgHc,
-        &gEfiDevicePathProtocolGuid,  &DwHc->DevicePath,
-        NULL
-        );
-  FREE_DWUSBHC:
-    gBS->FreePool (DwHc);
-  EXIT:
-    return Status;
-}
-#endif
 
 #pragma pack(1)
 typedef struct {
@@ -1869,7 +1836,7 @@ DwUsbDriverBindingStart (
 	// Start the asynchronous interrupt monitor
 	//
 	Status = gBS->CreateEvent (EVT_TIMER | EVT_NOTIFY_SIGNAL,
-							   TPL_NOTIFY,
+							   TPL_CALLBACK,
 							   DwHcTimerCallback,
 							   DwHc,
 							   &DwHc->PollTimer);
@@ -1877,7 +1844,7 @@ DwUsbDriverBindingStart (
 		DEBUG ((EFI_D_ERROR, "Failed to register DwUsbHostDxe Timer\n"));				
 	}
 
-	Status = gBS->SetTimer (DwHc->PollTimer, TimerPeriodic, DW_USB_POLL_TIMER);
+	Status = gBS->SetTimer (DwHc->PollTimer, TimerPeriodic, EFI_TIMER_PERIOD_MILLISECONDS(DW_USB_POLL_TIMER));
 	if (EFI_ERROR (Status)) {
 		DEBUG ((EFI_D_ERROR, "Failed to enable DwUsbHostDxe Timer\n"));				
 	}

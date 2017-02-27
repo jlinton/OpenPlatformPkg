@@ -41,7 +41,7 @@
 #include <Library/PcdLib.h>
 #include <Library/IoLib.h>
 #include <Library/TimerLib.h>
-
+#include "DwcHw.h"
 
 #define MAX_DEVICE                      16
 #define MAX_ENDPOINT                    16
@@ -86,6 +86,8 @@ struct _DWUSB_INTERRUPT_QUEUE {
     UINTN                                 MaximumPacketLength;
     EFI_USB2_HC_TRANSACTION_TRANSLATOR    *Translator;
 	UINT8                                 DataToggle;
+	UINT32                                TicksBeforeActive;
+	UINT32                                Ticks;
 };
 
 struct _DWUSB_OTGHC_DEV {
@@ -112,6 +114,7 @@ struct _DWUSB_OTGHC_DEV {
 	EFI_PCI_IO_PROTOCOL  *PciIo;
 	EFI_UNICODE_STRING_TABLE  *ControllerNameTable;
 	UINT32              BulkActive;
+	BOOLEAN             ActiveChannel[DWC2_MAX_CHANNELS];
 };
 
 #endif //_DWUSBHOSTDXE_H_
