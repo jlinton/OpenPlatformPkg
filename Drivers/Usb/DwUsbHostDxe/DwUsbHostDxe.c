@@ -24,17 +24,22 @@
 //  This also means that there is absolutely no prioritization, bandwidth reservations
 //  or anything else that are generally required of interrupt/isochronous transfers.
 //
-//  Everything is routed through a single "channel" (0), which limits its parallelism
-//  pretty significantly. But it doesn't matter, after all we don't even have interrupts.
+//  We no round robin the channels, this in theory allows us to have multiple commands
+//  outstanding, but due to the fact that we are either using a timer and mostly
+//  blocking thta timer during the command submission, its really unlikely that we 
+//  have more than a single command outstanding.
 //
 //  At the moment this is host only driver, and the phy config, which should be attached
 //  to the DW i2c channel likely isn't. 
 //
-//  This driver is currently forcing the bus to USB 1.1 Full/Low speed. This is because the 
-//  Split transaction support isn't working (its actually not working in linux mainline on 
-//  the hikey either). Although, it turns out the hikey users guide is wrong, the device can
-//  change its speed from full/low dynamically. So if we force the max speed to full, then
-//  everything should work, just slowly. 
+//  This driver defaults to High speed, but if we detect split transaction problems with
+//  low/full speed devices then we reset the root port and everything attached, and restart
+//  at a lower speed. This allows us to transparently support high/full/low speed devices. 
+//  That said, it seems low speed devices don't really work worth a darn on this controller. 
+//  There are assorted knobs that can be tiwiddled to tweak the low speed bitstream, but
+//  my USB analyzer is truly just a protocol analyzer and is unable to tell me how far out
+//  of spec the physical singaling is, and I'm currently to lazy to try an analyze it 
+//  with my scope/logic analyzer.
 //
 
 #include "DwUsbHostDxe.h"
@@ -42,16 +47,18 @@
 
 // Enabling this, disables attempting split transactions, and 
 // sets the initial root port to full speed (rather than high)
+// This option is less useful now that we detect full/low speed
+// devices having split transaction problems and automatically 
+// reset to full speed
 #define DW_AT_FULLSPEED 0
+
 // Forcing host mode may allow HS/FS/LS devices? Nah, doesn't 
 // appear that way on the HiSi, but do it anyway for the time.
 #define DW_FORCE_HOST   1 
 
-// slow the polling down for development purposes so that 
-// we can see whats happening. 
 // This timer controls how frequently we wake up to service
 // interrupt transfers (in milliseconds). 
-#define DW_USB_POLL_TIMER 10
+#define DW_USB_POLL_TIMER 50
 
 // timeout for interrupt transfers
 #define DW_USB_POLL_INTERRUPT   100 //100 ms
@@ -66,6 +73,9 @@
 VOID DwHcInit (IN DWUSB_OTGHC_DEV *DwHc);
 VOID DwCoreInit (IN DWUSB_OTGHC_DEV *DwHc);
 
+
+/* this routine is the only really HiKey specific routine
+   in the module, replace it with appropriate calls elsewhere */
 VOID
 ConfigureUsbPhy (
     VOID
@@ -348,16 +358,18 @@ DwOtgHcInit (
         (EpType << DWC2_HCCHAR_EPTYPE_OFFSET) |
         (MaxPacket << DWC2_HCCHAR_MPS_OFFSET);
 
-	if ((DeviceSpeed != EFI_USB_SPEED_HIGH) && (!DW_AT_FULLSPEED))
+	if ((DeviceSpeed != EFI_USB_SPEED_HIGH) && (!DwHc->AtFullSpeed))
 	{
 		DEBUG ((EFI_D_ERROR, "Split Message to %d speed device (%d,%d)  \n", DeviceSpeed, TtPort, TtHub));
 		Split = TtPort | (TtHub << DWC2_HCSPLT_HUBADDR_OFFSET);
-		Split |= DWC2_HCSPLT_XACTPOS_ALL << DWC2_HCSPLT_XACTPOS_OFFSET;
+		Split |= DWC2_HCSPLT_XACTPOS_ALL << DWC2_HCSPLT_XACTPOS_OFFSET; //do all packets? Or just the data payload?
+//		Split |= DWC2_HCSPLT_XACTPOS_BEGIN << DWC2_HCSPLT_XACTPOS_OFFSET;
 		Split |= DoComplete?DWC2_HCSPLT_COMPSPLT:0;
+		//Split |= DWC2_HCSPLT_COMPSPLT; //do a complete split transaction? (docs aren't 100% clear on what this means, although maybe its because i'm in DMA mode (hint that splits may not work with DMA)
 		Split |= DWC2_HCSPLT_SPLTENA;
 		// Do we need to set lowspeed? I'm guessing this is only when the root port is full/low
 		// because the "speed" of a split transaction is still high to the TT..
-		//Hcchar |= DWC2_HCCHAR_LSPDDEV;
+		Hcchar |= DWC2_HCCHAR_LSPDDEV;
 	} 
 	else if (DeviceSpeed == EFI_USB_SPEED_LOW)
 	{
@@ -527,7 +539,7 @@ DwHcTransfer (
 //		ArmDataSynchronizationBarrier();
 
         *TransferResult = Wait4Chhltd (DwHc, Channel, &Sub, Pid, IgnoreAck, IgnoreComplete, Timeout);
-		if ((DeviceSpeed != EFI_USB_SPEED_HIGH) && (!SplitDone) && (!DW_AT_FULLSPEED))
+		if ((DeviceSpeed != EFI_USB_SPEED_HIGH) && (!SplitDone) && (!DwHc->AtFullSpeed))
 		{
 			SplitDone++;
 			MmioWrite32 (DwHc->DwUsbBase + HCINT(Channel), 0x3FFF);
@@ -537,18 +549,14 @@ DwHcTransfer (
 //						continue;
 		}
 
+		DwHc->PciIo->Flush(DwHc->PciIo);
+
 		if (Mapping)
 		{
 			DwHc->PciIo->Unmap (DwHc->PciIo, Mapping);
 			Mapping = NULL;
 		}
 
-		/*  if (*TransferResult == EFI_USB_ERR_NAK ) {
-            // NAK's are still successful transmission
-            // particularly for interrupt transfers
-            Status = EFI_USB_NOERROR;
-            break;
-			}*/
         if (*TransferResult) {
             DEBUG ((EFI_D_VERBOSE, "DwHcTransfer: failed\n"));
             Status = EFI_DEVICE_ERROR;
@@ -592,12 +600,16 @@ DwHcGetCapability (
     OUT UINT8                 *Is64BitCapable
     )
 {
+    DWUSB_OTGHC_DEV *DwHc;
     DEBUG ((EFI_D_VERBOSE, "DwHcGetCapability \n",__func__));
+
+    DwHc = DWHC_FROM_THIS (This);
+
     if ((MaxSpeed == NULL) || (PortNumber == NULL) || (Is64BitCapable == NULL)) {
         return EFI_INVALID_PARAMETER;
     }
 
-	if (DW_AT_FULLSPEED)
+	if (DwHc->AtFullSpeed)
 	{
 		*MaxSpeed = EFI_USB_SPEED_FULL;
 	}
@@ -619,7 +631,7 @@ DwHcReset (
     )
 {
     DWUSB_OTGHC_DEV *DwHc;
-    DEBUG ((EFI_D_ERROR, "DwHcReset \n",__func__));
+    DEBUG ((EFI_D_ERROR, "Designware HostController Reset\n"));
 
     DwHc = DWHC_FROM_THIS (This);
 
@@ -734,7 +746,7 @@ DwHcGetRootHubPortStatus (
         PortStatus->PortStatus |= USB_PORT_STAT_POWER;
     }
 
-	if (!DW_AT_FULLSPEED)
+	if (!DwHc->AtFullSpeed)
 	{
 		PortStatus->PortStatus |= USB_PORT_STAT_HIGH_SPEED;
 	}
@@ -1032,6 +1044,13 @@ DwHcControlTransfer (
 
     if (EFI_ERROR(Status)) {
         DEBUG ((EFI_D_ERROR, "DwHcControlTransfer: Setup Stage Error\n"));
+		if ((DeviceSpeed != EFI_USB_SPEED_HIGH) && (DwHc->AtFullSpeed == 0))
+		{
+			DEBUG ((EFI_D_ERROR, "DwHcControlTransfer: Split transaction failed, reducing bus speed\n"));
+			DwHc->AtFullSpeed = 1;
+			DwHcReset(This, 0);
+		}
+		Status = EFI_USB_ERR_SYSTEM;
         goto EXIT;
     }
 
@@ -1238,8 +1257,12 @@ DwHcAsyncInterruptTransfer (
 	CompletionEntry->DeviceSpeed = DeviceSpeed;
 	CompletionEntry->MaximumPacketLength = MaximumPacketLength;
 	CompletionEntry->Translator = Translator;
-	CompletionEntry->TicksBeforeActive = PollingInterval/DW_USB_POLL_TIMER;
-	CompletionEntry->Ticks = 0;
+	if (PollingInterval > DW_USB_POLL_TIMER) {
+		CompletionEntry->TicksBeforeActive = (PollingInterval/DW_USB_POLL_TIMER);
+	} else {
+		CompletionEntry->TicksBeforeActive = 1;
+	}
+	CompletionEntry->Ticks = -1;
 
     Status      = EFI_SUCCESS;
 
@@ -1333,7 +1356,7 @@ InitFslspClkSel (
     MmioAndThenOr32 (DwHc->DwUsbBase + HCFG,
                      ~DWC2_HCFG_FSLSPCLKSEL_MASK,
                      PhyClk << DWC2_HCFG_FSLSPCLKSEL_OFFSET);
-	if (DW_AT_FULLSPEED)
+	if (DwHc->AtFullSpeed)
 	{
 		MmioAndThenOr32 (DwHc->DwUsbBase + HCFG,
 						 ~DWC2_HCFG_FSLSSUPP,
@@ -1398,7 +1421,6 @@ DwHcTimerCallback (
 			UINT8         EpAddress;
 			EFI_STATUS    Status;
 			EFI_USB2_HC_TRANSACTION_TRANSLATOR    *Translator = CompletionEntry->Translator;
-			int           Retry = 1;
 			UINTN         DataLength;
 			UINT32        Timeout = DW_USB_POLL_INTERRUPT;
 			
@@ -1409,66 +1431,60 @@ DwHcTimerCallback (
 				DEBUG ((EFI_D_VERBOSE, "DwHcTimerCallbackn Reset timer for addr1\n"));
 			}
 
-			while (Retry) {
-				Retry--;
-				// ok execute thie
-				EpAddress   = CompletionEntry->EndPointAddress & 0x0F;
-				TransferDirection = (CompletionEntry->EndPointAddress >> 7) & 0x01;
+			// ok execute thie
+			EpAddress   = CompletionEntry->EndPointAddress & 0x0F;
+			TransferDirection = (CompletionEntry->EndPointAddress >> 7) & 0x01;
 								
-				Pid         = (CompletionEntry->DataToggle) << 1;	
-				DataLength  = CompletionEntry->DataLength;
+			Pid         = CompletionEntry->DataToggle;
+			DataLength  = CompletionEntry->DataLength;
 				
-				DEBUG ((EFI_D_VERBOSE, "DwHcTimerCallback message to  addr=%d, EP=%d\n",CompletionEntry->DeviceAddress, EpAddress));
+			DEBUG ((EFI_D_VERBOSE, "DwHcTimerCallback message to  addr=%d, EP=%d Pid=%d\n",CompletionEntry->DeviceAddress, EpAddress, Pid));
 
-				Status = DwHcTransfer (DwHc, CompletionEntry->DeviceAddress, CompletionEntry->MaximumPacketLength, &Pid, TransferDirection, 
-									   CompletionEntry->Data, &DataLength,
-									   EpAddress, DWC2_HCCHAR_EPTYPE_INTR, &CompletionEntry->TransferResult, 1, 0, CompletionEntry->DeviceSpeed,
-									   Translator->TranslatorPortNumber, Translator->TranslatorHubAddress, 1, Timeout);
+			Status = DwHcTransfer (DwHc, CompletionEntry->DeviceAddress, CompletionEntry->MaximumPacketLength, &Pid, TransferDirection, 
+								   CompletionEntry->Data, &DataLength,
+								   EpAddress, DWC2_HCCHAR_EPTYPE_INTR, &CompletionEntry->TransferResult, 1, 0, CompletionEntry->DeviceSpeed,
+								   Translator->TranslatorPortNumber, Translator->TranslatorHubAddress, 1, Timeout);
 
-				(CompletionEntry->DataToggle) = Pid >> 1;
-				
-				if (EFI_ERROR(Status))
-				{
-					//DEBUG ((EFI_D_ERROR, "Consider canceling the transaction here?\n"));
-					if (CompletionEntry->TransferResult == EFI_USB_ERR_NAK ) {
-						// NAK's are still successful transmission
-						// particularly for interrupt transfers
-						Status = EFI_USB_NOERROR;
-					}
-
-					if (CompletionEntry->TransferResult == (EFI_USB_ERR_SYSTEM+1) ) {
-						// overruns may still have data, lets pass it on
-						Status = EFI_USB_NOERROR;
-						//DataLength = CompletionEntry->DataLength;
-						//CompletionEntry->TransferResult = EFI_USB_NOERROR;
-					}
-					if (CompletionEntry->TransferResult == EFI_USB_ERR_TIMEOUT)
-					{
-						// This actually appears to recovery everything correctly
-						// but does it really need recovery, or just a retry?
-						//DEBUG ((EFI_D_ERROR, "Doing full reset\n"));
-						// doing full reset
-						DwHcReset(CompletionEntry->This,0);
-					}
-
+			DEBUG ((EFI_D_VERBOSE, "DwHcTimerCallback Pid=%d\n", Pid));
+			if (EFI_ERROR(Status))
+			{
+				//DEBUG ((EFI_D_ERROR, "Consider canceling the transaction here?\n"));
+				if (CompletionEntry->TransferResult == EFI_USB_ERR_NAK ) {
+					// NAK's are still successful transmission
+					// particularly for interrupt transfers
+					Status = EFI_USB_NOERROR;
 				}
-				
-				if (CompletionEntry->TransferResult != EFI_USB_ERR_SYSTEM) //DATA toggle?
-				{
-					break;
+
+				if (CompletionEntry->TransferResult == (EFI_USB_ERR_SYSTEM+1) ) {
+					// overruns may still have data, lets pass it on
+					Status = EFI_USB_NOERROR;
+					//DataLength = CompletionEntry->DataLength;
+					//CompletionEntry->TransferResult = EFI_USB_NOERROR;
 				}
-				// data toggle error do it again (this destabilizes the whole mess)
-				//(*CompletionEntry->DataToggle) = ++Pid >> 1;
+				if (CompletionEntry->TransferResult == EFI_USB_ERR_TIMEOUT)
+				{
+					// This actually appears to recovery everything correctly
+					// but does it really need recovery, or just a retry?
+					//DEBUG ((EFI_D_ERROR, "Doing full reset\n"));
+					// doing full reset
+					DwHcReset(CompletionEntry->This,0);
+				}
+
 			}
+				
+			CompletionEntry->DataToggle = Pid;
 			
-
-			CompletionEntry->CallBackFunction (CompletionEntry->Data, DataLength, CompletionEntry->Context, CompletionEntry->TransferResult);
+			// don't report NAK's and DATA Toggle errors, what the end user doesn't know won't kill them..
+			if ((CompletionEntry->TransferResult != EFI_USB_ERR_SYSTEM) && (CompletionEntry->TransferResult != EFI_USB_ERR_NAK )) {
+				CompletionEntry->CallBackFunction (CompletionEntry->Data, DataLength, CompletionEntry->Context, CompletionEntry->TransferResult);
+			}
 			CompletionEntry->Ticks = 0; //reset the ticks
 		}
 	}
 
 	{
 		// Nove canceled items to a cancel list
+		// and then delete all the entries on the canceled list
 		DWUSB_INTERRUPT_QUEUE *Canceled;
 		// now remove any canceled entries
 		OriginalTPL = gBS->RaiseTPL(TPL_HIGH_LEVEL);
@@ -1645,11 +1661,12 @@ CreateDwUsbHc (
     DwHc->DwUsbOtgHc.ClearRootHubPortFeature        = DwHcClearRootHubPortFeature;
     DwHc->DwUsbOtgHc.MajorRevision                  = 0x02;
     DwHc->DwUsbOtgHc.MinorRevision                  = 0x00;
-    DwHc->DwUsbBase         = FixedPcdGet32 (PcdDwUsbBaseAddress);
+    DwHc->DwUsbBase         = FixedPcdGet32 (PcdDwUsbBaseAddress); //TODO remove this and convert to Pci->Mem.Read/Write() calls
 
 	DwHc->InterruptQueue = NULL;
 	DwHc->PciIo = PciIo;
 	DwHc->BulkActive = 0;
+	DwHc->AtFullSpeed = DW_AT_FULLSPEED;
 
 	for (Channel = 0 ; Channel < DWC2_MAX_CHANNELS; Channel++)
 	{

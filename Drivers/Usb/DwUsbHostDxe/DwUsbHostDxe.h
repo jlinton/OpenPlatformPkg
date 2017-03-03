@@ -87,7 +87,7 @@ struct _DWUSB_INTERRUPT_QUEUE {
     EFI_USB2_HC_TRANSACTION_TRANSLATOR    *Translator;
 	UINT8                                 DataToggle;
 	UINT32                                TicksBeforeActive;
-	UINT32                                Ticks;
+	INT32                                 Ticks;
 };
 
 struct _DWUSB_OTGHC_DEV {
@@ -114,6 +114,7 @@ struct _DWUSB_OTGHC_DEV {
 	EFI_PCI_IO_PROTOCOL  *PciIo;
 	EFI_UNICODE_STRING_TABLE  *ControllerNameTable;
 	UINT32              BulkActive;
+	BOOLEAN             AtFullSpeed;
 	BOOLEAN             ActiveChannel[DWC2_MAX_CHANNELS];
 };
 
