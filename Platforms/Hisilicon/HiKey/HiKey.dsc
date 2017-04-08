@@ -403,6 +403,9 @@
   EmbeddedPkg/RealTimeClockRuntimeDxe/RealTimeClockRuntimeDxe.inf
   EmbeddedPkg/MetronomeDxe/MetronomeDxe.inf
 
+  # HiKey Soc Specific
+  OpenPlatformPkg/Platforms/Hisilicon/HiKey/Drivers/HiKeyDxe/HiKeyDxe.inf 
+
   MdeModulePkg/Universal/Console/ConPlatformDxe/ConPlatformDxe.inf
   MdeModulePkg/Universal/Console/ConSplitterDxe/ConSplitterDxe.inf
   MdeModulePkg/Universal/Console/TerminalDxe/TerminalDxe.inf

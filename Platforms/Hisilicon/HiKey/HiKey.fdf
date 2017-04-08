@@ -100,6 +100,9 @@ READ_LOCK_STATUS   = TRUE
   INF EmbeddedPkg/RealTimeClockRuntimeDxe/RealTimeClockRuntimeDxe.inf
   INF EmbeddedPkg/MetronomeDxe/MetronomeDxe.inf
 
+  # Hikey Soc Control
+  INF OpenPlatformPkg/Platforms/Hisilicon/HiKey/Drivers/HiKeyDxe/HiKeyDxe.inf 
+
   #
   # Multiple Console IO support
   #
