@@ -37,10 +37,14 @@
   OpenPlatformPkg/Platforms/AMD/Styx/AmdStyx.dec
 
 [LibraryClasses]
+  AmdStyxAcpiLib
   DebugLib
+  PcdLib
   UefiBootServicesTableLib
   UefiDriverEntryPoint
-  AmdStyxAcpiLib
+
+[Pcd]
+  gAmdStyxTokenSpaceGuid.PcdEnableSmmus
 
 [Protocols]
   gEfiAcpiTableProtocolGuid                     ## ALWAYS_CONSUMED

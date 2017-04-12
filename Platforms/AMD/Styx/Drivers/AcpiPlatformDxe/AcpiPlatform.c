@@ -23,8 +23,9 @@
 #include <Protocol/AcpiTable.h>
 
 #include <Library/BaseMemoryLib.h>
-#include <Library/UefiBootServicesTableLib.h>
 #include <Library/DebugLib.h>
+#include <Library/PcdLib.h>
+#include <Library/UefiBootServicesTableLib.h>
 
 #define MAX_ACPI_TABLES    12
 
@@ -65,6 +66,9 @@ AcpiPlatformEntryPoint (
   AcpiTableList[TableIndex++] = SpcrHeader();
   AcpiTableList[TableIndex++] = McfgHeader();
   AcpiTableList[TableIndex++] = CsrtHeader();
+  if (PcdGetBool (PcdEnableSmmus)) {
+    AcpiTableList[TableIndex++] = IortHeader();
+  }
   AcpiTableList[TableIndex++] = NULL;
 
   DEBUG((DEBUG_INFO, "%a(): ACPI Table installer\n", __FUNCTION__));

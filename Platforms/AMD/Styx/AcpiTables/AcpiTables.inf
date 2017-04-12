@@ -37,6 +37,7 @@
   Mcfg.c
   Csrt.c
   Dsdt.c
+  Iort.c
 
 [Packages]
   ArmPkg/ArmPkg.dec
