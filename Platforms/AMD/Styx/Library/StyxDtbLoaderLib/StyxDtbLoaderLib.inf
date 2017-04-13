@@ -37,6 +37,7 @@
   DxeServicesLib
   FdtLib
   MemoryAllocationLib
+  PcdLib
   PrintLib
   UefiBootServicesTableLib
 
@@ -44,6 +45,7 @@
   gAmdStyxTokenSpaceGuid.PcdSocCpuId
   gAmdStyxTokenSpaceGuid.PcdEthMacA
   gAmdStyxTokenSpaceGuid.PcdEthMacB
+  gAmdStyxTokenSpaceGuid.PcdEnableSmmus
   gArmTokenSpaceGuid.PcdSystemMemoryBase
 
 [FixedPcd]

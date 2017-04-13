@@ -22,6 +22,7 @@
 #include <Library/DebugLib.h>
 #include <Library/DxeServicesLib.h>
 #include <Library/MemoryAllocationLib.h>
+#include <Library/PcdLib.h>
 #include <Library/PrintLib.h>
 #include <Library/UefiBootServicesTableLib.h>
 
@@ -189,6 +190,46 @@ SetMacAddress (
 
 #endif
 
+STATIC
+VOID
+DisableSmmu (
+  IN  VOID          *Fdt,
+  IN  CONST CHAR8   *IommuPropName,
+  IN  CONST CHAR8   *SmmuNodeName,
+  IN  CONST CHAR8   *DeviceNodeName
+  )
+{
+  INT32   Node;
+  INT32   Error;
+
+  Node = fdt_path_offset (Fdt, DeviceNodeName);
+  if (Node <= 0) {
+    DEBUG ((DEBUG_WARN, "%a: Failed to find path %s: %a\n",
+      __FUNCTION__, DeviceNodeName, fdt_strerror (Node)));
+    return;
+  }
+
+  Error = fdt_delprop (Fdt, Node, IommuPropName);
+  if (Error != 0) {
+    DEBUG ((DEBUG_WARN, "%a: Failed to delete property %a: %a\n",
+      __FUNCTION__, IommuPropName, fdt_strerror (Error)));
+    return;
+  }
+
+  Node = fdt_path_offset (Fdt, SmmuNodeName);
+  if (Node <= 0) {
+    DEBUG ((DEBUG_WARN, "%a: Failed to find path %s: %a\n",
+      __FUNCTION__, SmmuNodeName, fdt_strerror (Node)));
+    return;
+  }
+
+  Error = fdt_del_node (Fdt, Node);
+  if (Error != 0) {
+    DEBUG ((DEBUG_WARN, "%a: Failed to delete node %a: %a\n",
+      __FUNCTION__, SmmuNodeName, fdt_strerror (Error)));
+  }
+}
+
 #define STYX_SOC_VERSION_MASK    0xFFF
 #define STYX_SOC_VERSION_A0      0x000
 #define STYX_SOC_VERSION_B0      0x010
@@ -216,6 +257,16 @@ SetSocIdStatus (
 #else
   SetDeviceStatus (Fdt, "kcs@e0010000", FALSE);
 #endif
+
+  if (!PcdGetBool (PcdEnableSmmus)) {
+    DisableSmmu (Fdt, "iommu-map", "/smb/smmu@e0a00000", "/smb/pcie@f0000000");
+    DisableSmmu (Fdt, "iommus", "/smb/smmu@e0200000", "/smb/sata@e0300000");
+    DisableSmmu (Fdt, "iommus", "/smb/smmu@e0c00000", "/smb/sata@e0d00000");
+#if DO_XGBE
+    DisableSmmu (Fdt, "iommus", "/smb/smmu@e0600000", "/smb/xgmac@e0700000");
+    DisableSmmu (Fdt, "iommus", "/smb/smmu@e0800000", "/smb/xgmac@e0900000");
+#endif
+  }
 }
 
 STATIC
