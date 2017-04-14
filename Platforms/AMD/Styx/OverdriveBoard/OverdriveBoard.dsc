@@ -515,8 +515,10 @@ DEFINE DO_KCS       = 1
   gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageFtwWorkingBase64|0x0
   gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageFtwSpareBase64|0x0
 
-[PcdsDynamicExHii.common.DEFAULT]
+[PcdsDynamicHii]
   gEfiMdePkgTokenSpaceGuid.PcdPlatformBootTimeOut|L"Timeout"|gEfiGlobalVariableGuid|0x0|5
+
+  gAmdStyxTokenSpaceGuid.PcdEnableSmmus|L"StyxEnableSmmus"|gAmdStyxVariableGuid|0x0|FALSE
 
 ################################################################################
 #

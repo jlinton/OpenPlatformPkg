@@ -35,6 +35,10 @@
   gAmdStyxTokenSpaceGuid     = { 0x220d9653, 0x4a0e, 0x40bc, { 0xb3, 0x65, 0x2f, 0xbb, 0xa2, 0xd9, 0x03, 0x45 } }
   gAmdStyxMpCoreInfoGuid     = { 0x68efeabd, 0xcb77, 0x4aa5, { 0xbf, 0x0c, 0xa3, 0x31, 0xfc, 0xcf, 0x76, 0x66 } }
 
+  # 2a5e4deb-4445-4fb6-8b14-366b8e779b69
+  # EFI variable scope for Styx
+  gAmdStyxVariableGuid       = { 0x2a5e4deb, 0x4445, 0x4fb6, { 0x8b, 0x14, 0x36, 0x6b, 0x8e, 0x77, 0x9b, 0x69 } }
+
 [PcdsDynamic]
   gAmdStyxTokenSpaceGuid.PcdSocCoreCount|1|UINT32|0x00000100
   gAmdStyxTokenSpaceGuid.PcdSocCpuId|1|UINT32|0x00000101
@@ -108,3 +112,6 @@
   gAmdStyxTokenSpaceGuid.PcdFlashNvStorageOriginalBase|0|UINT64|0x000c0000
   # block size to use when invoking the ISCP FV methods
   gAmdStyxTokenSpaceGuid.PcdFlashNvStorageBlockSize|0x1000|UINT32|0x000c0001
+
+[PcdsFixedAtBuild,PcdsDynamic]
+  gAmdStyxTokenSpaceGuid.PcdEnableSmmus|FALSE|BOOLEAN|0xe0000000
