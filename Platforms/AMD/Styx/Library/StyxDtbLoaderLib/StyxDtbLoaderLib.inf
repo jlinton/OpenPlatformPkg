@@ -41,7 +41,6 @@
   UefiBootServicesTableLib
 
 [Pcd]
-  gAmdStyxTokenSpaceGuid.PcdStyxFdt
   gAmdStyxTokenSpaceGuid.PcdSocCpuId
   gAmdStyxTokenSpaceGuid.PcdEthMacA
   gAmdStyxTokenSpaceGuid.PcdEthMacB

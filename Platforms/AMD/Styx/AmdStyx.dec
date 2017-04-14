@@ -46,9 +46,6 @@
   # CPUID Register
   gAmdStyxTokenSpaceGuid.PcdCpuIdRegister|0xE0000010|UINT32|0x00000200
 
-  # FDT support
-  gAmdStyxTokenSpaceGuid.PcdStyxFdt|{ 0xe4, 0x08, 0x0d, 0x04, 0x9a, 0x47, 0x4b, 0x42, 0x8c, 0x42, 0x36, 0x64, 0xdf, 0x79, 0x3f, 0x4b }|VOID*|0x00010000
-
   # Synopsys SATA Controller
   gAmdStyxTokenSpaceGuid.PcdSata0CtrlAxiSlvPort|0xE0300000|UINT32|0x00020000
   gAmdStyxTokenSpaceGuid.PcdSata0PortCount|8|UINT8|0x00020001
