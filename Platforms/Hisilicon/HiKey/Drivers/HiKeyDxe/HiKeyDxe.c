@@ -40,6 +40,20 @@ HiKeyInitPeripherals (
   do {
     Data = MmioRead32 (SC_PERIPH_RSTSTAT3);
   } while (Data & Bits);
+
+  // make sure mmc2 is out of reset
+  Bits = PERI_RST0_MMC2;
+  MmioWrite32 (SC_PERIPH_RSTDIS0, Bits);
+  do {
+    Data = MmioRead32 (SC_PERIPH_RSTSTAT0);
+  } while (Data & Bits);
+
+  /* enable wifi/bt clock */
+  MmioWrite32 (PMUSSI_REG_EX (SC_PMIC_CLK19M2_600_586_EN), 1); //enable 32khz clock
+  // enable wifi clock
+  Data  = MmioRead32 (PMUSSI_REG_EX (SC_PMIC_WLAN_CLK));
+  Data |= SC_PMIC_WLAN_CLK_ENABLE;
+  MmioWrite32 (PMUSSI_REG_EX (SC_PMIC_WLAN_CLK), Data);
 }
 
 
