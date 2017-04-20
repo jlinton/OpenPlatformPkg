@@ -2,4 +2,58 @@ This repository holds support for UEFI ports for various platforms,
 until such a time as a complete solution for platform support in
 Tianocore EDK2 is available.
 
+In particular this repo corrects a number of deficiencies in the linaro/hikey
+and upstream Openplatform package with respect to the 96boards Hikey. With
+those corrections in place the hikey can be used as a normal linux distro
+target. In particular fedora/aarch64 can be installed from the standard
+install images to a device of the users choosing. Right now the hikey still
+requires a serial port for console and UEFI BDS/shell support, but if I feel
+motivated I will see about creating a "port" of the linux fbdev driver here
+as well. That in theory will allow the machine be be self hosted simply with a
+keyboard and monitor as fedora support for aarch64 graphical installs is
+functional as of F25. The one serious "gocha" here is the fact that the
+original USB2 hikey's host mode cannot seem to form split transactions, or
+at least cannot do it the same way that older dwusb controllers form
+them (like most ARM SBCs the docs on the hikey are pretty much non-existant,
+despite the 96boards attempts to fool everyone by documenting <10% of the
+system registers). This means that having a USB2 Ethernet adapter and a USB
+keyboard plugged in at the same time simply isn't possible if you want to
+maintain performance > 120KB/sec on the Ethernet adapter. 
+
+Anyway, enough complaining. Now some rough instructions:
+
+On a fedora machine:
+(install fastboot to flash the device)
+dnf install android-tools-5.1.1_r8-6.1.x86_64
+wget https://builds.96boards.org/releases/hikey/linaro/binaries/latest/hisi-idt.py
+wget https://builds.96boards.org/releases/hikey/linaro/binaries/latest/l-loader.bin
+wget https://builds.96boards.org/releases/hikey/linaro/binaries/latest/nvme.img
+
+Put HikeyDebugFip.bin and ptable-fedora.img from the FedoraArtifacts directory
+in the directory with the above utilities. Plug a USB cable from the linux
+machine to the micro-usb connector on the hikey board (not the seedstudio
+serial port board, that should be plugged in else where). Jumper pins 2-3, and
+power cycle/reset the board. Now a serial port should appear on the machine. 
+
+(start a fastboot on the hikey)
+./hisi-idt.py -d /dev/ttyUSB0 --img1=l-loader.bin
+(now flash the ptable and fip.bin to the hikey)
+fastboot flash ptable ptable-fedora.img
+fastboot flash fastboot HikeyDebugFip.bin
+(remove the jumper on pins 2-3)
+fastboot reboot
+(remove the USB cable from the micro usb, otherwise plugged in devices won't
+be recognized)
+
+Plug in a USB DVD with a fedora image burned on it, or dd a fedora ISO image
+to a USB flash device and plug that in. Hit reset (or use your favorite method
+for picking up new devices). The USB device should show up in the BDS or on
+the command prompt (aka 'fs0:' 'cd efi/boot' 'grub.efi'). Run through the
+install menu's. Be warned that the emmc shows up as mmcblk0 and if you format it, the
+machine will have to be reflashed. 
+
+Other links for similar instructions using debian imaage/etc can be found on
+the fedora pages. 
+
+
 The "upstream" for this project is https://git.linaro.org/uefi/OpenPlatformPkg.git

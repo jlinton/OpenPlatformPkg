@@ -1,0 +1,95 @@
+From b8e31a7e9a4614d370b394dd4cf5491674899970 Mon Sep 17 00:00:00 2001
+From: Jeremy Linton <lintonrjeremy@gmail.com>
+Date: Sun, 26 Feb 2017 22:29:20 -0600
+Subject: [RFC/PATCH] Tweaks to the NonDiscoverable PCI device code
+
+Hi, so the dwusbhost driver seems stable at USB2 High speed,
+having low speed devices is a problem if the host isn't forced
+to full speed because i can't figure out how to get the host controller
+to send split transactions, even though its newer than the device I have docs
+for. So, something is missing, and that might be that HiSi simply
+built a version of the controller that is not capable of split
+transactions (which would be insane and likely violates the spec). 
+I will see what it does on the RPi RSN.
+
+Anyway, to the point. For sure, I needed a dsb (possibly only a dmb) 
+following the pci->map() calls on that machine. I think I've isolated the
+place in the code where this would normally go. OTOH, I also tweaked the
+library to add the memory space, which seems to have helped as well. Its
+possible that might have been the only thing I needed. So, all the
+combitions of memory/regions and their appropiate flags your probably the best
+judge of this, so feel free to tell me where I'm being stupid. Partially because
+I assumed simply setting EFI_MEMORY_UC would create the mapping, but it didn't 
+appear to change the mapping during boot (per the shell memmap).
+
+Thanks,
+
+---
+ .../NonDiscoverablePciDeviceIo.c                        |  1 +
+ .../NonDiscoverableDeviceRegistrationLib.c              | 17 +++++++++++++++++
+ .../NonDiscoverableDeviceRegistrationLib.inf            |  1 +
+ 3 files changed, 19 insertions(+)
+
+diff --git a/MdeModulePkg/Bus/Pci/NonDiscoverablePciDeviceDxe/NonDiscoverablePciDeviceIo.c b/MdeModulePkg/Bus/Pci/NonDiscoverablePciDeviceDxe/NonDiscoverablePciDeviceIo.c
+index c836ad6..16f73ce 100644
+--- a/MdeModulePkg/Bus/Pci/NonDiscoverablePciDeviceDxe/NonDiscoverablePciDeviceIo.c
++++ b/MdeModulePkg/Bus/Pci/NonDiscoverablePciDeviceDxe/NonDiscoverablePciDeviceIo.c
+@@ -1055,6 +1055,7 @@ NonCoherentPciIoMap (
+     MapInfo->AllocAddress = (EFI_PHYSICAL_ADDRESS)(UINTN)AllocAddress;
+     if (Operation == EfiPciIoOperationBusMasterRead) {
+       gBS->CopyMem (AllocAddress, HostAddress, *NumberOfBytes);
++//	  ArmDataSynchronizationBarrier ();
+     }
+     *DeviceAddress = MapInfo->AllocAddress;
+   } else {
+diff --git a/MdeModulePkg/Library/NonDiscoverableDeviceRegistrationLib/NonDiscoverableDeviceRegistrationLib.c b/MdeModulePkg/Library/NonDiscoverableDeviceRegistrationLib/NonDiscoverableDeviceRegistrationLib.c
+index 536dfc7..a7dec3c 100644
+--- a/MdeModulePkg/Library/NonDiscoverableDeviceRegistrationLib/NonDiscoverableDeviceRegistrationLib.c
++++ b/MdeModulePkg/Library/NonDiscoverableDeviceRegistrationLib/NonDiscoverableDeviceRegistrationLib.c
+@@ -18,6 +18,7 @@
+ #include <Library/BaseMemoryLib.h>
+ #include <Library/DebugLib.h>
+ #include <Library/DevicePathLib.h>
++#include <Library/DxeServicesTableLib.h>
+ #include <Library/MemoryAllocationLib.h>
+ #include <Library/NonDiscoverableDeviceRegistrationLib.h>
+ #include <Library/UefiBootServicesTableLib.h>
+@@ -165,7 +166,23 @@ RegisterNonDiscoverableMmioDevice (
+     Desc->ResType               = ACPI_ADDRESS_SPACE_TYPE_MEM;
+     Desc->AddrSpaceGranularity  = ((EFI_PHYSICAL_ADDRESS)Base + Size > SIZE_4GB) ? 64 : 32;
+     Desc->AddrTranslationOffset = 0;
++	// TODO Declare the controller as EFI_MEMORY_RUNTIME???
++	Status = gDS->AddMemorySpace (
++		                          EfiGcdMemoryTypeMemoryMappedIo,
++								  Base, Size,
++								  EFI_MEMORY_UC | EFI_MEMORY_RUNTIME
++		);
++	if (EFI_ERROR (Status)) {
++		return Status;
++	}
++
++	Status = gDS->SetMemorySpaceAttributes (Base, Size, EFI_MEMORY_UC | EFI_MEMORY_RUNTIME);
++	if (EFI_ERROR (Status)) {
++		return Status;
++	}
++
+   }
++
+   VA_END (Args);
+ 
+   End = (EFI_ACPI_END_TAG_DESCRIPTOR *)&Device->Resources [NumMmioResources];
+diff --git a/MdeModulePkg/Library/NonDiscoverableDeviceRegistrationLib/NonDiscoverableDeviceRegistrationLib.inf b/MdeModulePkg/Library/NonDiscoverableDeviceRegistrationLib/NonDiscoverableDeviceRegistrationLib.inf
+index dfcf8dc..5dfad42 100644
+--- a/MdeModulePkg/Library/NonDiscoverableDeviceRegistrationLib/NonDiscoverableDeviceRegistrationLib.inf
++++ b/MdeModulePkg/Library/NonDiscoverableDeviceRegistrationLib/NonDiscoverableDeviceRegistrationLib.inf
+@@ -31,6 +31,7 @@
+   BaseMemoryLib
+   DebugLib
+   DevicePathLib
++  DxeServicesTableLib
+   UefiBootServicesTableLib
+ 
+ [Protocols]
+-- 
+2.10.2
+
