@@ -1,0 +1,44 @@
+#/** @file
+# Framework Module Development Environment Industry Standards
+#
+# This Package provides headers and libraries that conform to EFI/PI Industry standards.
+# Copyright (c) 2007, Intel Corporation. All rights reserved.<BR>
+# Copyright (c) 2012-2014, ARM Ltd. All rights reserved.<BR>
+# Copyright (c) 2015-2017, Linaro. All rights reserved.<BR>
+#
+#    This program and the accompanying materials are licensed and made available under
+#    the terms and conditions of the BSD License which accompanies this distribution.
+#    The full text of the license may be found at
+#    http://opensource.org/licenses/bsd-license.php
+#
+#    THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
+#    WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+#
+#**/
+
+[Defines]
+  DEC_SPECIFICATION              = 0x00010019
+  PACKAGE_NAME                   = BlockVariableDxe
+  PACKAGE_GUID                   = 0c31a0d5-6aaf-4349-b3e3-88257c2bea75
+  PACKAGE_VERSION                = 0.1
+
+
+################################################################################
+#
+# Include Section - list of Include Paths that are provided by this package.
+#                   Comments are used for Keywords and Module Types.
+#
+# Supported Module Types:
+#  BASE SEC PEI_CORE PEIM DXE_CORE DXE_DRIVER DXE_RUNTIME_DRIVER DXE_SMM_DRIVER DXE_SAL_DRIVER UEFI_DRIVER UEFI_APPLICATION
+#
+################################################################################
+
+[Guids.common]
+  gBlockVariableDxeTokenSpaceGuid       = { 0x40b81959, 0xd48c, 0x4517,  { 0xb2, 0x46, 0x9b, 0xf3, 0x64, 0x68, 0x80, 0xb6 }}
+
+[PcdsFixedAtBuild.common]
+  # BlockVariableDxe PCDs
+  gBlockVariableDxeTokenSpaceGuid.PcdNvStorageVariableBlockCount|0x0|UINT32|0x00000001                  
+  gBlockVariableDxeTokenSpaceGuid.PcdNvStorageVariableBlockSize|0x0|UINT32|0x00000002                   
+  gBlockVariableDxeTokenSpaceGuid.PcdNvStorageVariableBlockLba|0x0|UINT32|0x00000003                   
+  gBlockVariableDxeTokenSpaceGuid.PcdNvStorageVariableBlockDevicePath|L""|VOID*|0x00000004
