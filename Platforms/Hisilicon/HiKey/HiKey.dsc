@@ -89,6 +89,7 @@
 
   NetLib|MdeModulePkg/Library/DxeNetLib/DxeNetLib.inf
 
+
   #
   # Assume everything is fixed at build
   #
@@ -284,6 +285,12 @@
   #
   # NV Storage PCDs.
   #
+  # Note that this corresponds to the nvme section in the hikey ptable
+  gBlockVariableDxeTokenSpaceGuid.PcdNvStorageVariableBlockCount|0x00001000
+  gBlockVariableDxeTokenSpaceGuid.PcdNvStorageVariableBlockSize|0x00000200
+  gBlockVariableDxeTokenSpaceGuid.PcdNvStorageVariableBlockLba|0x00006000
+  gBlockVariableDxeTokenSpaceGuid.PcdNvStorageVariableBlockDevicePath|L"VenHw(B549F005-4BD4-4020-A0CB-06F42BDA68C3)/HD(5,GPT,00354BCD-BBCB-4CB3-B5AE-CDEFCB5DAC43)"
+
   gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageVariableBase|0x30000000
   gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageVariableSize|0x00010000
   gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageFtwWorkingBase|0x30010000
@@ -412,7 +419,13 @@
   MdeModulePkg/Universal/SerialDxe/SerialDxe.inf
 
   MdeModulePkg/Universal/FaultTolerantWriteDxe/FaultTolerantWriteDxe.inf
-  MdeModulePkg/Universal/Variable/EmuRuntimeDxe/EmuVariableRuntimeDxe.inf
+  OpenPlatformPkg/Drivers/BlockVariableDxe/BlockVariableDxe.inf
+  MdeModulePkg/Universal/Variable/RuntimeDxe/VariableRuntimeDxe.inf {
+    <LibraryClasses>
+      TpmMeasurementLib|MdeModulePkg/Library/TpmMeasurementLibNull/TpmMeasurementLibNull.inf
+      AuthVariableLib|MdeModulePkg/Library/AuthVariableLibNull/AuthVariableLibNull.inf
+      VarCheckLib|MdeModulePkg/Library/VarCheckLib/VarCheckLib.inf
+  }
 
   ArmPkg/Drivers/ArmGic/ArmGicDxe.inf
   ArmPkg/Drivers/TimerDxe/TimerDxe.inf
