@@ -48,7 +48,7 @@ be recognized)
 Plug in a USB DVD with a fedora image burned on it, or dd a fedora ISO image
 to a USB flash device and plug that in. Hit reset (or use your favorite method
 for picking up new devices). The USB device should show up in the BDS or on
-the command prompt (aka 'fs0:' 'cd efi/boot' 'grub.efi'). Run through the
+the command prompt (aka 'fs0:' 'cd efi/boot' 'grubaa64.efi'). Run through the
 install menu's. Be warned that the emmc shows up as mmcblk0 and if you format it, the
 machine will have to be reflashed. 
 
