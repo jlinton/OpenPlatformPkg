@@ -423,7 +423,7 @@ DEFINE DO_KCS       = 1
   gEfiMdePkgTokenSpaceGuid.PcdPciExpressBaseAddress|0xF0000000
 
   gArmTokenSpaceGuid.PcdPciBusMin|0x0
-  gArmTokenSpaceGuid.PcdPciBusMax|0xFF
+  gArmTokenSpaceGuid.PcdPciBusMax|0x7F
 
   gArmTokenSpaceGuid.PcdPciIoBase|0x1000
   gArmTokenSpaceGuid.PcdPciIoSize|0xF000
