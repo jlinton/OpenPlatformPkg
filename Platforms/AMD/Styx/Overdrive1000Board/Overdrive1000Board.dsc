@@ -402,11 +402,6 @@ DEFINE DO_KCS       = 1
   gArmTokenSpaceGuid.PcdGicInterruptInterfaceBase|0xE112F000
 
   #
-  # ARM Architectual Timer Frequency
-  #
-  gArmTokenSpaceGuid.PcdArmArchTimerFreqInHz|187500000
-
-  #
   # 2 ports active on Overdrive 1000
   #
   gAmdStyxTokenSpaceGuid.PcdSata0PortCount|2

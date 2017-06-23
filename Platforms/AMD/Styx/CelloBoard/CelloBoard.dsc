@@ -400,11 +400,6 @@ DEFINE DO_KCS    = 0
   gArmTokenSpaceGuid.PcdGicInterruptInterfaceBase|0xE112F000
 
   #
-  # ARM Architectual Timer Frequency
-  #
-  gArmTokenSpaceGuid.PcdArmArchTimerFreqInHz|187500000
-
-  #
   # Cello has 2 SATA ports on the first controller.
   #
   gAmdStyxTokenSpaceGuid.PcdSata0PortCount|2

@@ -409,11 +409,6 @@ DEFINE DO_KCS       = 1
   gArmTokenSpaceGuid.PcdGicInterruptInterfaceBase|0xE112F000
 
   #
-  # ARM Architectual Timer Frequency
-  #
-  gArmTokenSpaceGuid.PcdArmArchTimerFreqInHz|187500000
-
-  #
   # Overdrive B1 has 14 SATA ports across 2 controllers.
   #
   gAmdStyxTokenSpaceGuid.PcdSata0PortCount|8
