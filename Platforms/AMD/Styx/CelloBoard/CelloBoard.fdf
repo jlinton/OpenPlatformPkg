@@ -139,6 +139,15 @@ READ_LOCK_STATUS   = TRUE
   INF AmdModulePkg/Iscp/IscpDxe.inf
 
   #
+  # FDT support
+  #
+  INF EmbeddedPkg/Drivers/DtPlatformDxe/DtPlatformDxe.inf
+
+  FILE FREEFORM = 25462CDA-221F-47DF-AC1D-259CFAA4E326 {
+    SECTION RAW = OpenPlatformPkg/Platforms/AMD/Styx/OverdriveBoard/FdtBlob/styx-overdrive.dtb
+  }
+
+  #
   # PCI support
   #
   INF AmdModulePkg/Gionb/Gionb.inf
