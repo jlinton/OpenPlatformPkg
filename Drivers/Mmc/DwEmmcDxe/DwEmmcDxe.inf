@@ -17,7 +17,7 @@
   INF_VERSION                    = 0x00010019
   BASE_NAME                      = DwEmmcDxe
   FILE_GUID                      = b549f005-4bd4-4020-a0cb-06f42bda68c3
-  MODULE_TYPE                    = DXE_DRIVER
+  MODULE_TYPE                    = DXE_RUNTIME_DRIVER
   VERSION_STRING                 = 1.0
 
   ENTRY_POINT                    = DwEmmcDxeInitialize

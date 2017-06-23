@@ -18,7 +18,7 @@
   INF_VERSION                    = 0x00010005
   BASE_NAME                      = BlockVariableDxe
   FILE_GUID                      = 522fc4a8-46d8-403e-a415-e2dbb1e0ebc0
-  MODULE_TYPE                    = DXE_DRIVER
+  MODULE_TYPE                    = DXE_RUNTIME_DRIVER
   VERSION_STRING                 = 1.0
 
   ENTRY_POINT                    = BlockVariableDxeInitialize

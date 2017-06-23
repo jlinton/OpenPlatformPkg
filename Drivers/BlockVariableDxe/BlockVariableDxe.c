@@ -21,9 +21,11 @@
 #include <Library/CacheMaintenanceLib.h>
 #include <Library/DebugLib.h>
 #include <Library/DevicePathLib.h>
+#include <Library/DxeServicesTableLib.h>
 #include <Library/IoLib.h>
 #include <Library/MemoryAllocationLib.h>
 #include <Library/PcdLib.h>
+#include <Library/UefiRuntimeServicesTableLib.h>
 #include <Library/UefiBootServicesTableLib.h>
 #include <Library/UefiLib.h>
 
@@ -31,6 +33,24 @@
 
 
 STATIC EFI_PHYSICAL_ADDRESS      mMapNvStorageVariableBase;
+STATIC EFI_EVENT mSetVirtualAddressMapEvent = NULL;
+
+STATIC VOID 
+EFIAPI 
+NotifySetVirtualAddressMap ( 
+  IN EFI_EVENT  Event, 
+  IN VOID       *Context 
+  ) 
+{ 
+  EFI_STATUS  Status; 
+  Status = gRT->ConvertPointer ( 
+                  EFI_OPTIONAL_PTR, 
+                  (VOID **)&mMapNvStorageVariableBase 
+                  ); 
+  if (EFI_ERROR (Status)) {
+    DEBUG ((EFI_D_ERROR, "Unable to convert runtime pointer Status:%x\n", Status));
+  }
+}
 
 EFI_STATUS
 EFIAPI
@@ -380,6 +400,30 @@ BlockVariableDxeInitialize (
   }
   NvStorageData = (UINT8 *) (UINTN) PcdGet32(PcdFlashNvStorageVariableBase);
   mMapNvStorageVariableBase = PcdGet32(PcdFlashNvStorageVariableBase);
+
+//  Status = gDS->AddMemorySpace (EfiGcdMemoryTypeMemoryMappedIo, mMapNvStorageVariableBase, PcdGet32(PcdFlashNvStorageVariableSize), EFI_MEMORY_RUNTIME);
+
+  // we want to reserve this buffer as runtime data
+  Status = gBS->AllocatePages (AllocateAddress, EfiRuntimeServicesData, EFI_SIZE_TO_PAGES(PcdGet32(PcdFlashNvStorageVariableSize)), &mMapNvStorageVariableBase);
+  if (EFI_ERROR (Status)) {
+    DEBUG ((EFI_D_ERROR, "Warning: Couldn't runtime pages (status: %r)\n", Status));
+    return EFI_INVALID_PARAMETER;
+  }
+
+  // ok we have the pages and we are a runtime service, so we need notification when a va is associated with the pa
+  // 
+  // Create a Set Virtual Address Map event. 
+  // 
+  Status = gBS->CreateEvent ( 
+                  EVT_SIGNAL_VIRTUAL_ADDRESS_CHANGE,  // Type 
+                  TPL_NOTIFY,                         // NotifyTpl 
+                  NotifySetVirtualAddressMap,      // NotifyFunction 
+                  NULL,                               // NotifyContext 
+                  &mSetVirtualAddressMapEvent         // Event 
+                  ); 
+  ASSERT_EFI_ERROR (Status); 
+
+
   NvBlockDevicePath = &Instance->DevicePath;
   NvBlockDevicePath = ConvertTextToDevicePath ((CHAR16*)FixedPcdGetPtr (PcdNvStorageVariableBlockDevicePath));
   Status = gBS->LocateDevicePath (&gEfiBlockIoProtocolGuid, &NvBlockDevicePath,

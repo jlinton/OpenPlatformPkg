@@ -629,7 +629,8 @@ DwEmmcDxeInitialize (
 
   Handle = NULL;
 
-  gpIdmacDesc = (DWEMMC_IDMAC_DESCRIPTOR *)AllocatePages (DWEMMC_MAX_DESC_PAGES);
+  gpIdmacDesc = (DWEMMC_IDMAC_DESCRIPTOR *)AllocateRuntimePages (DWEMMC_MAX_DESC_PAGES);
+  
   if (gpIdmacDesc == NULL) {
     return EFI_BUFFER_TOO_SMALL;
   }
