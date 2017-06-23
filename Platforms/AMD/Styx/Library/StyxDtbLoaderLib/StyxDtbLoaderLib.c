@@ -243,6 +243,7 @@ SetSocIdStatus (
 {
   UINT32        SocId;
   BOOLEAN       IsRevB1;
+  BOOLEAN       DisableXgbeSmmus;
 
   SocId = PcdGet32 (PcdSocCpuId);
   IsRevB1 = (SocId & STYX_SOC_VERSION_MASK) >= STYX_SOC_VERSION_B1;
@@ -261,11 +262,21 @@ SetSocIdStatus (
   if (!PcdGetBool (PcdEnableSmmus)) {
     DisableSmmu (Fdt, "iommu-map", "/smb/smmu@e0a00000", "/smb/pcie@f0000000");
     DisableSmmu (Fdt, "iommus", "/smb/smmu@e0200000", "/smb/sata@e0300000");
+  }
+
+  if (!PcdGetBool (PcdEnableSmmus) || !IsRevB1 || FixedPcdGet8 (PcdSata1PortCount) == 0) {
     DisableSmmu (Fdt, "iommus", "/smb/smmu@e0c00000", "/smb/sata@e0d00000");
+  }
+
 #if DO_XGBE
+  DisableXgbeSmmus = !PcdGetBool (PcdEnableSmmus);
+#else
+  DisableXgbeSmmus = TRUE;
+#endif
+
+  if (DisableXgbeSmmus) {
     DisableSmmu (Fdt, "iommus", "/smb/smmu@e0600000", "/smb/xgmac@e0700000");
     DisableSmmu (Fdt, "iommus", "/smb/smmu@e0800000", "/smb/xgmac@e0900000");
-#endif
   }
 }
 
