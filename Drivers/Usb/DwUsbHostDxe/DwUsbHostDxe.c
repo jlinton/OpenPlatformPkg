@@ -74,6 +74,10 @@ VOID DwHcInit (IN DWUSB_OTGHC_DEV *DwHc);
 VOID DwCoreInit (IN DWUSB_OTGHC_DEV *DwHc);
 
 
+#define HI6220_PERI_BASE         0xF7030000
+#define PERI_SC_PERIPH_CLK0_EN	 0x200
+#define PERI_SC_PERIPH_CLK0_DIS	 0x204
+#define PERI_SC_PERIPH_CLK0_STAT 0x208
 /* this routine is the only really HiKey specific routine
    in the module, replace it with appropriate calls elsewhere */
 VOID
@@ -84,40 +88,40 @@ ConfigureUsbPhy (
     UINT32 Data;
     DEBUG ((EFI_D_VERBOSE, "ConfigureUsbPhy \n",__func__));
     /*Enable USB clock*/
-    Data = MmioRead32 (0xF7030000 + 0x200);
+    Data = MmioRead32 (HI6220_PERI_BASE + PERI_SC_PERIPH_CLK0_EN);
     Data |= 0x10;
-    MmioWrite32 (0xF7030000 + 0x200, 0x10);
+    MmioWrite32 (HI6220_PERI_BASE + PERI_SC_PERIPH_CLK0_EN, 0x10);
 
     do {
-        Data = MmioRead32 (0xF7030000 + 0x208);
+        Data = MmioRead32 (HI6220_PERI_BASE + PERI_SC_PERIPH_CLK0_STAT);
     } while ((Data & 0x10) == 0);
 
     /*Take USB IPs out of reset*/
     MmioWrite32 (0xF7030000 + 0x304, 0xF0);
 
     do {
-        Data = MmioRead32 (0xF7030000 + 0x308);
+        Data = MmioRead32 (HI6220_PERI_BASE + 0x308);
         Data &= 0xF0;
     } while (Data);
 
     /*CTRL5*/
-    Data = MmioRead32 (0xF7030000 + 0x010);
+    Data = MmioRead32 (HI6220_PERI_BASE + 0x010);
     Data &= ~0x20;
     Data |= 0x318;
-    MmioWrite32 (0xF7030000 + 0x010, Data);
+    MmioWrite32 (HI6220_PERI_BASE + 0x010, Data);
 
     /*CTRL4*/
     /*Configure USB PHY*/
-    Data = MmioRead32 (0xF7030000 + 0x00C);
+    Data = MmioRead32 (HI6220_PERI_BASE + 0x00C);
 
     /*make PHY out of low power mode*/
     Data &= ~0x40;
     Data &= ~0x100;
     Data |= 0xC00;
     Data &= ~0x200000;
-    MmioWrite32 (0xF7030000 + 0x00C, Data);
+    MmioWrite32 (HI6220_PERI_BASE + 0x00C, Data);
 
-    MmioWrite32 (0xF7030000 + 0x018, 0x70533483); //EYE_PATTERN
+    MmioWrite32 (HI6220_PERI_BASE + 0x018, 0x70533483); //EYE_PATTERN
 
     MicroSecondDelay (5000);
 }
