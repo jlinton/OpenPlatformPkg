@@ -404,6 +404,7 @@ DEFINE DO_KCS    = 0
   #
   gAmdStyxTokenSpaceGuid.PcdSata0PortCount|2
   gAmdStyxTokenSpaceGuid.PcdSata1PortCount|0
+  gAmdStyxTokenSpaceGuid.PcdSataPortMode|0xf
 
   # PCIe Support
   gEfiMdePkgTokenSpaceGuid.PcdPciExpressBaseAddress|0xF0000000

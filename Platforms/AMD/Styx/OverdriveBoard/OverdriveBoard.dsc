@@ -415,7 +415,7 @@ DEFINE DO_KCS       = 1
   # will crash the firmware. So use the first controller only.
   #
   gAmdStyxTokenSpaceGuid.PcdSata0PortCount|8
-  gAmdStyxTokenSpaceGuid.PcdSata1PortCount|0
+  gAmdStyxTokenSpaceGuid.PcdSataPortMode|0xffff
 
   # PCIe Support
   gEfiMdePkgTokenSpaceGuid.PcdPciExpressBaseAddress|0xF0000000
