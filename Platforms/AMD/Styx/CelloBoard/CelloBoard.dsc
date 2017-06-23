@@ -17,7 +17,7 @@
 ################################################################################
 [Defines]
 
-DEFINE NUM_CORES = 8
+DEFINE NUM_CORES = 4
 DEFINE DO_KCS    = 0
 
   PLATFORM_NAME                  = Cello
