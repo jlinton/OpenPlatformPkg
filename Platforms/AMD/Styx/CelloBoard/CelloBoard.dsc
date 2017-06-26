@@ -17,8 +17,9 @@
 ################################################################################
 [Defines]
 
-DEFINE NUM_CORES = 4
-DEFINE DO_KCS    = 0
+DEFINE NUM_CORES    = 4
+DEFINE DO_KCS       = 0
+DEFINE DO_FLASHER   = FALSE
 
   PLATFORM_NAME                  = Cello
   PLATFORM_GUID                  = 77861b3e-74b0-4ff3-8d18-c5ba5803e1bf
@@ -689,4 +690,11 @@ DEFINE DO_KCS    = 0
 
 !ifdef $(RENESAS_XHCI_FW_DIR)
   OpenPlatformPkg/Drivers/Xhci/RenesasFirmwarePD720202/RenesasFirmwarePD720202.inf
+!endif
+
+!if $(DO_FLASHER) == TRUE
+  OpenPlatformPkg/Platforms/AMD/Styx/Applications/StyxFlashUefi/StyxFlashUefi.inf {
+    <LibraryClasses>
+      ShellCEntryLib|ShellPkg/Library/UefiShellCEntryLib/UefiShellCEntryLib.inf
+  }
 !endif

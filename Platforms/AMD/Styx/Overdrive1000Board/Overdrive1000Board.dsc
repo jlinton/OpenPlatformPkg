@@ -21,6 +21,7 @@ DEFINE NUM_CORES    = 4
 DEFINE DO_PSCI      = 1
 DEFINE DO_ISCP      = 1
 DEFINE DO_KCS       = 1
+DEFINE DO_FLASHER   = FALSE
 
   PLATFORM_NAME                  = Overdrive1000
   PLATFORM_GUID                  = 36774DD7-20DE-4C5B-8722-f8861DFF1F16
@@ -701,3 +702,10 @@ DEFINE DO_KCS       = 1
       gEfiShellPkgTokenSpaceGuid.PcdShellLibAutoInitialize|FALSE
       gEfiMdePkgTokenSpaceGuid.PcdUefiLibMaxPrintBufferSize|8000
   }
+
+!if $(DO_FLASHER) == TRUE
+  OpenPlatformPkg/Platforms/AMD/Styx/Applications/StyxFlashUefi/StyxFlashUefi.inf {
+    <LibraryClasses>
+      ShellCEntryLib|ShellPkg/Library/UefiShellCEntryLib/UefiShellCEntryLib.inf
+  }
+!endif
