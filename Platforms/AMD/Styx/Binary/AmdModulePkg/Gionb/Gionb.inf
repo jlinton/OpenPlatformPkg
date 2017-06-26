@@ -41,11 +41,9 @@ ENTRY_POINT = PeiInitGionb
   AmdModulePkg/AmdModulePkg.dec
 
 [PatchPcd]
-  gAmdModulePkgTokenSpaceGuid.PcdPcieCoreConfiguration|2|0xa4d9
-  gAmdModulePkgTokenSpaceGuid.PcdPciePort0Present|1|0xa4c2
-  gAmdModulePkgTokenSpaceGuid.PcdPciePort1Present|1|0xa4ab
-  gAmdModulePkgTokenSpaceGuid.PcdPciePort2Present|1|0xa4d8
-  gAmdModulePkgTokenSpaceGuid.PcdPcieHardcodeEnumeration|TRUE|0xa4ac
-  gAmdModulePkgTokenSpaceGuid.PcdPcieGenMax|2|0xa4ad
-  gAmdModulePkgTokenSpaceGuid.PcdPcieGen3|0|0xa4c1
-  gAmdModulePkgTokenSpaceGuid.PcdPcieGen2|0|0xa4c0
+  gAmdModulePkgTokenSpaceGuid.PcdPcieCoreConfiguration|2|0x8B60
+  gAmdModulePkgTokenSpaceGuid.PcdPcieHardcodeEnumeration|TRUE|0x8C7C
+  gAmdModulePkgTokenSpaceGuid.PcdPcieGenMax|2|0x8ECC
+  gAmdModulePkgTokenSpaceGuid.PcdPciePort0Present|1|0x8ECD
+  gAmdModulePkgTokenSpaceGuid.PcdPciePort1Present|1|0x8ECE
+  gAmdModulePkgTokenSpaceGuid.PcdPciePort2Present|1|0x8ECF
