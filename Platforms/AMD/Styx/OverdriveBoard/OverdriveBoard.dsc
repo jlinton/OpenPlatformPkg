@@ -409,10 +409,13 @@ DEFINE DO_KCS       = 1
   gArmTokenSpaceGuid.PcdGicInterruptInterfaceBase|0xE112F000
 
   #
-  # Overdrive B1 has 14 SATA ports across 2 controllers.
+  # AMD's B1 based Overdrive has 14 SATA ports across 2 controllers. However,
+  # it appears that Softiron's Overdrive 3000, which is also B1 based, does
+  # not have the second SATA controller enabled, and any attempts to use it
+  # will crash the firmware. So use the first controller only.
   #
   gAmdStyxTokenSpaceGuid.PcdSata0PortCount|8
-  gAmdStyxTokenSpaceGuid.PcdSata1PortCount|6
+  gAmdStyxTokenSpaceGuid.PcdSata1PortCount|0
 
   # PCIe Support
   gEfiMdePkgTokenSpaceGuid.PcdPciExpressBaseAddress|0xF0000000
