@@ -122,7 +122,7 @@ DEFINE DO_FLASHER   = FALSE
   #
   AmdSataInit|AmdModulePkg/Library/AmdSataInitLib/AmdSataInitLib.inf
   AmdStyxAcpiLib|OpenPlatformPkg/Platforms/AMD/Styx/AcpiTables/AcpiTables.inf
-  EfiResetSystemLib|OpenPlatformPkg/Platforms/AMD/Styx/Library/ResetSystemLib/ResetSystemLib.inf
+  ResetSystemLib|ArmPkg/Library/ArmSmcPsciResetSystemLib/ArmSmcPsciResetSystemLib.inf
   RealTimeClockLib|OpenPlatformPkg/Platforms/AMD/Styx/Library/RealTimeClockLib/RealTimeClockLib.inf
 
   CapsuleLib|MdeModulePkg/Library/DxeCapsuleLibNull/DxeCapsuleLibNull.inf
@@ -526,7 +526,7 @@ DEFINE DO_FLASHER   = FALSE
   MdeModulePkg/Universal/CapsuleRuntimeDxe/CapsuleRuntimeDxe.inf
   MdeModulePkg/Universal/FaultTolerantWriteDxe/FaultTolerantWriteDxe.inf
   MdeModulePkg/Universal/MonotonicCounterRuntimeDxe/MonotonicCounterRuntimeDxe.inf
-  EmbeddedPkg/ResetRuntimeDxe/ResetRuntimeDxe.inf
+  MdeModulePkg/Universal/ResetSystemRuntimeDxe/ResetSystemRuntimeDxe.inf
   EmbeddedPkg/RealTimeClockRuntimeDxe/RealTimeClockRuntimeDxe.inf
   EmbeddedPkg/MetronomeDxe/MetronomeDxe.inf
   MdeModulePkg/Universal/EbcDxe/EbcDxe.inf
