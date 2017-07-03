@@ -83,7 +83,7 @@
   PlatformPeiLib|ArmPlatformPkg/PlatformPei/PlatformPeiLib.inf
   ArmPlatformSysConfigLib|ArmPlatformPkg/ArmVExpressPkg/Library/ArmVExpressSysConfigLib/ArmVExpressSysConfigLib.inf
   NorFlashPlatformLib|ArmPlatformPkg/ArmVExpressPkg/Library/NorFlashArmVExpressLib/NorFlashArmVExpressLib.inf
-  EfiResetSystemLib|ArmPlatformPkg/ArmVExpressPkg/Library/ResetSystemLib/ResetSystemLib.inf
+  ResetSystemLib|ArmPkg/Library/ArmSmcPsciResetSystemLib/ArmSmcPsciResetSystemLib.inf
 !ifdef EDK2_ENABLE_PL111
   # ARM PL111 Lcd Driver
   LcdPlatformLib|ArmPlatformPkg/ArmVExpressPkg/Library/PL111LcdArmVExpressLib/PL111LcdArmVExpressLib.inf
@@ -247,15 +247,14 @@
   BaseCryptLib|CryptoPkg/Library/BaseCryptLib/RuntimeCryptLib.inf
 !endif
 
-[LibraryClasses.AARCH64.DXE_RUNTIME_DRIVER]
+[LibraryClasses.ARM]
   #
   # PSCI support in EL3 may not be available if we are not running under a PSCI
-  # compliant secure firmware, but since the default VExpress EfiResetSystemLib
-  # cannot be supported at runtime (due to the fact that the syscfg MMIO registers
-  # cannot be runtime remapped), it is our best bet to get ResetSystem functionality
-  # on these platforms.
+  # compliant secure firmware. Assume PSCI on AARCH64, and fall back to the
+  # syscfg MMIO register implementation on ARM.
+  # This will not work at actual runtime.
   #
-  EfiResetSystemLib|ArmPkg/Library/ArmPsciResetSystemLib/ArmPsciResetSystemLib.inf
+  EfiResetSystemLib|ArmPlatformPkg/ArmVExpressPkg/Library/ResetSystemLib/ResetSystemLib.inf
 
 [LibraryClasses.ARM, LibraryClasses.AARCH64]
   #
