@@ -254,7 +254,7 @@
   # syscfg MMIO register implementation on ARM.
   # This will not work at actual runtime.
   #
-  EfiResetSystemLib|ArmPlatformPkg/ArmVExpressPkg/Library/ResetSystemLib/ResetSystemLib.inf
+  ResetSystemLib|ArmPlatformPkg/ArmVExpressPkg/Library/ResetSystemLib/ResetSystemLib.inf
 
 [LibraryClasses.ARM, LibraryClasses.AARCH64]
   #
