@@ -94,7 +94,7 @@
   # Reset and Time libraries
   EfiTimeBaseLib|OpenPlatformPkg/Library/EfiTimeBaseLib/EfiTimeBaseLib.inf
   RealTimeClockLib|OpenPlatformPkg/Platforms/Marvell/Armada/Library/RealTimeClockLib/RealTimeClockLib.inf
-  EfiResetSystemLib|OpenPlatformPkg/Platforms/Marvell/Library/ResetSystemLib/MvResetSystemLib.inf
+  ResetSystemLib|ArmPkg/Library/ArmSmcPsciResetSystemLib/ArmSmcPsciResetSystemLib.inf
 
   # Network support
   NetLib|MdeModulePkg/Library/DxeNetLib/DxeNetLib.inf
@@ -411,7 +411,7 @@
   MdeModulePkg/Universal/Variable/EmuRuntimeDxe/EmuVariableRuntimeDxe.inf
 
   EmbeddedPkg/EmbeddedMonotonicCounter/EmbeddedMonotonicCounter.inf
-  EmbeddedPkg/ResetRuntimeDxe/ResetRuntimeDxe.inf
+  MdeModulePkg/Universal/ResetSystemRuntimeDxe/ResetSystemRuntimeDxe.inf
   EmbeddedPkg/RealTimeClockRuntimeDxe/RealTimeClockRuntimeDxe.inf
   EmbeddedPkg/MetronomeDxe/MetronomeDxe.inf
 
