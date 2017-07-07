@@ -324,9 +324,9 @@ Wait4Chhltd (
     else
         HcintCompHltAck |= DWC2_HCINT_ACK;
 
-	if (IgnoreComplete)	{
-		Hcint |= DWC2_HCINT_XFERCOMP;
-	}
+    if (IgnoreComplete) {
+        Hcint |= DWC2_HCINT_XFERCOMP;
+    }
 
     if (Hcint != HcintCompHltAck) {
         DEBUG ((EFI_D_ERROR, "Wait4Chhltd: HCINT Error 0x%x\n", Hcint));
