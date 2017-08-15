@@ -33,7 +33,9 @@
 
 
 STATIC EFI_PHYSICAL_ADDRESS      mMapNvStorageVariableBase;
+STATIC EFI_PHYSICAL_ADDRESS      mTempBuffer;
 STATIC EFI_EVENT mSetVirtualAddressMapEvent = NULL;
+STATIC UINTN DisableStorage = FALSE;
 
 STATIC VOID 
 EFIAPI 
@@ -50,6 +52,17 @@ NotifySetVirtualAddressMap (
   if (EFI_ERROR (Status)) {
     DEBUG ((EFI_D_ERROR, "Unable to convert runtime pointer Status:%x\n", Status));
   }
+
+  Status = gRT->ConvertPointer ( 
+                  EFI_OPTIONAL_PTR, 
+                  (VOID **)&mTempBuffer 
+                  ); 
+  if (EFI_ERROR (Status)) {
+    DEBUG ((EFI_D_ERROR, "Unable to convert runtime pointer Status:%x\n", Status));
+  }
+
+  DisableStorage = TRUE;
+
 }
 
 EFI_STATUS
@@ -171,19 +184,24 @@ FvbWrite (
   EFI_BLOCK_IO_PROTOCOL         *BlockIo;
   EFI_STATUS                    Status;
   UINTN                         Bytes;
-  VOID                          *DataPtr;
+  VOID                          *DataPtr = (VOID *)mTempBuffer;
+
 
   Instance = CR (This, BLOCK_VARIABLE_INSTANCE, FvbProtocol, BLOCK_VARIABLE_SIGNATURE);
   BlockIo = Instance->BlockIoProtocol;
   Bytes = (Offset + *NumBytes + Instance->Media.BlockSize - 1) / Instance->Media.BlockSize * Instance->Media.BlockSize;
-  DataPtr = AllocateZeroPool (Bytes);
-  if (DataPtr == NULL) {
-    DEBUG ((EFI_D_ERROR, "FvbWrite: failed to allocate buffer.\n"));
-    return EFI_BUFFER_TOO_SMALL;
+//  DataPtr = AllocateZeroPool (Bytes);
+//  if (DataPtr == NULL) {
+//    DEBUG ((EFI_D_ERROR, "FvbWrite: failed to allocate buffer.\n"));
+//    return EFI_BUFFER_TOO_SMALL;
+//  }
+  if (DisableStorage)  {
+     return EFI_SUCCESS;
   }
   WriteBackDataCacheRange (DataPtr, Bytes);
   Status = BlockIo->ReadBlocks (BlockIo, BlockIo->Media->MediaId, Instance->StartLba + Lba,
                                 Bytes, DataPtr);
+
   if (EFI_ERROR (Status)) {
     DEBUG ((EFI_D_ERROR, "FvbWrite: failed on reading blocks.\n"));
     goto exit;
@@ -205,7 +223,7 @@ FvbWrite (
             Instance->StartLba, Lba, Offset, Status));
   }
 exit:
-  FreePool (DataPtr);
+//  FreePool (DataPtr);
   return Status;
 }
 
@@ -380,6 +398,7 @@ BlockVariableDxeInitialize (
   VOID                            *Headers;
   UINTN                           HeadersLength;
 
+  DEBUG ((EFI_D_ERROR, "Starting persisten variable storage\n"));
   Instance->Signature = BLOCK_VARIABLE_SIGNATURE;
 
   HeadersLength = sizeof(EFI_FIRMWARE_VOLUME_HEADER) + sizeof(EFI_FV_BLOCK_MAP_ENTRY) + sizeof(VARIABLE_STORE_HEADER);
@@ -396,6 +415,7 @@ BlockVariableDxeInitialize (
   Instance->StartLba = Lba;
   HeadersLength = sizeof(EFI_FIRMWARE_VOLUME_HEADER) + sizeof(EFI_FV_BLOCK_MAP_ENTRY) + sizeof(VARIABLE_STORE_HEADER);
   if (NvStorageSize < HeadersLength) {
+    DEBUG ((EFI_D_ERROR, "%a: bad header len in nvstorage\n", __func__));
     return EFI_BAD_BUFFER_SIZE;
   }
   NvStorageData = (UINT8 *) (UINTN) PcdGet32(PcdFlashNvStorageVariableBase);
@@ -406,9 +426,16 @@ BlockVariableDxeInitialize (
   // we want to reserve this buffer as runtime data
   Status = gBS->AllocatePages (AllocateAddress, EfiRuntimeServicesData, EFI_SIZE_TO_PAGES(PcdGet32(PcdFlashNvStorageVariableSize)), &mMapNvStorageVariableBase);
   if (EFI_ERROR (Status)) {
-    DEBUG ((EFI_D_ERROR, "Warning: Couldn't runtime pages (status: %r)\n", Status));
+    DEBUG ((EFI_D_ERROR, "Warning: Couldn't allocate runtime pages (status: %r)\n", Status));
     return EFI_INVALID_PARAMETER;
   }
+
+  Status = gBS->AllocatePages (AllocateAnyPages, EfiRuntimeServicesData, EFI_SIZE_TO_PAGES(1024*1024*2), &mTempBuffer); //2M temp buffer
+  if (EFI_ERROR (Status)) {
+    DEBUG ((EFI_D_ERROR, "Warning: Couldn't allocate temp runtime pages (status: %r)\n", Status));
+    return EFI_INVALID_PARAMETER;
+  }
+
 
   // ok we have the pages and we are a runtime service, so we need notification when a va is associated with the pa
   // 
@@ -446,6 +473,7 @@ BlockVariableDxeInitialize (
   }
   WriteBackDataCacheRange (Instance, sizeof(BLOCK_VARIABLE_INSTANCE));
 
+  DEBUG ((EFI_D_ERROR, "Install protocol\n"));
   Handle = NULL;
   Status = gBS->InstallMultipleProtocolInterfaces (
 		  &Handle,
