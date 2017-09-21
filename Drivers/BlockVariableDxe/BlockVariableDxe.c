@@ -398,6 +398,7 @@ BlockVariableDxeInitialize (
   VOID                            *Headers;
   UINTN                           HeadersLength;
 
+  DisableStorage = FALSE;
   DEBUG ((EFI_D_ERROR, "Starting persisten variable storage\n"));
   Instance->Signature = BLOCK_VARIABLE_SIGNATURE;
 
