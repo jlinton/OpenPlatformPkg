@@ -301,7 +301,6 @@ SendCommand (
 
   MmioWrite32 (DWSD_RINTSTS, ~0);
   MmioWrite32 (DWSD_CMDARG, Argument);
-  MicroSecondDelay(500);
   // Wait until MMC is idle
   do {
     Data = MmioRead32 (DWSD_STATUS);
@@ -313,7 +312,6 @@ SendCommand (
             DWSD_INT_RCRC | DWSD_INT_RE;
   ErrMask |= DWSD_INT_DCRC | DWSD_INT_DRT | DWSD_INT_SBE;
   do {
-    MicroSecondDelay(500);
     Data = MmioRead32 (DWSD_RINTSTS);
 
     if (Data & ErrMask) {
@@ -324,10 +322,13 @@ SendCommand (
       break;
   } while (!(Data & DWSD_INT_CMD_DONE));
   MmcCmd &= 0x3f;
-  if (MmcCmd == 17)
-    MicroSecondDelay(100);
-  else if (MmcCmd != 13)
+  if (MmcCmd == 17) {
+	  //DEBUG ((EFI_D_ERROR, "Sleep for 17\n"));
+  }
+  else if (MmcCmd != 13) {
+	  //DEBUG ((EFI_D_ERROR, "Sleep for 13\n"));
     MicroSecondDelay(5000);
+  }
 
   return EFI_SUCCESS;
 }
@@ -617,7 +618,6 @@ ReadFifo (
   DEBUG ((EFI_D_ERROR, "TBB:%x, TCB:%x, BYTCNT:%x, BLKSIZ:%x\n", MmioRead32 (DWSD_TBBCNT), MmioRead32 (DWSD_TCBCNT), MmioRead32 (DWSD_BYTCNT), MmioRead32 (DWSD_BLKSIZ)));
 #else
   /* FIXME */
-  MicroSecondDelay (1000);
 #endif
   return EFI_SUCCESS;
 }
