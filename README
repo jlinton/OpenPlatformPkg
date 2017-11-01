@@ -46,14 +46,13 @@ fastboot reboot
 be recognized)
 
 Plug in a USB DVD with a fedora image burned on it, or dd a fedora ISO image
-to a USB flash device and plug that in. Hit reset (or use your favorite method
-for picking up new devices). The USB device should show up in the BDS or on
+to a USB flash device (or SD) and plug that in. Hit reset (or use your favorite method
+for picking up new devices). The USB or SD volume should show up in the BDS or on
 the command prompt (aka 'fs0:' 'cd efi/boot' 'grubaa64.efi'). Run through the
-install menu's. Be warned that the emmc shows up as mmcblk0 and if you format it, the
-machine will have to be reflashed. 
-
-Other links for similar instructions using debian imaage/etc can be found on
-the fedora pages. 
-
+install menu's. This version of the firmware removes emmc support from the
+device tree in preparation for the future were the runtime variable store can
+actually be updated properly. Currently variables written while linux is
+booted won't be stored to the emmc. Variables written before exit boot
+service (aka when the firmware is running) should be saved.
 
 The "upstream" for this project is https://git.linaro.org/uefi/OpenPlatformPkg.git
