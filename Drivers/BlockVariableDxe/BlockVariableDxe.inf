@@ -25,12 +25,14 @@
 
 [Sources.common]
   BlockVariableDxe.c
+  BlockVariableMmc.c
 
 [Packages]
 #  HisiPkg/HisiPlatformPkg.dec
   OpenPlatformPkg/Drivers/BlockVariableDxe/BlockVariableDxe.dec
   MdePkg/MdePkg.dec
   MdeModulePkg/MdeModulePkg.dec
+  EmbeddedPkg/EmbeddedPkg.dec
 
 [LibraryClasses]
   ArmLib
@@ -41,6 +43,7 @@
   UefiDriverEntryPoint
   UefiLib
   UncachedMemoryAllocationLib
+  TimerLib
 
 [Guids]
   gEfiSystemNvDataFvGuid
@@ -60,7 +63,8 @@
   gBlockVariableDxeTokenSpaceGuid.PcdNvStorageVariableBlockCount                  ## CONSUMES
   gBlockVariableDxeTokenSpaceGuid.PcdNvStorageVariableBlockSize                   ## CONSUMES
   gBlockVariableDxeTokenSpaceGuid.PcdNvStorageVariableBlockLba                    ## CONSUMES
-  gBlockVariableDxeTokenSpaceGuid.PcdNvStorageVariableBlockDevicePath             ## CONSUMES
+  gBlockVariableDxeTokenSpaceGuid.PcdNvStorageVariableBlockDevicePath		  ## CONSUMES
+  gBlockVariableDxeTokenSpaceGuid.PcdDwEmmcDxeBaseAddress	                  ## CONSUMES
 
 [Depex]
   TRUE

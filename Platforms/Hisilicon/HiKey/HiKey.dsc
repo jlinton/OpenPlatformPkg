@@ -351,6 +351,7 @@
   #
   #  This describes the onboard fixed MMC, which we should 
   #  really be hiding from linux/etc
+  gBlockVariableDxeTokenSpaceGuid.PcdDwEmmcDxeBaseAddress|0xF723D000
   gDwEmmcDxeTokenSpaceGuid.PcdDwEmmcDxeBaseAddress|0xF723D000
   gDwEmmcDxeTokenSpaceGuid.PcdDwEmmcDxeClockFrequencyInHz|100000000
   #  We want the SD slot, so we can put a decent amount of storage on it

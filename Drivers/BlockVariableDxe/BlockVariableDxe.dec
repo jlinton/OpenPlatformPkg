@@ -42,3 +42,5 @@
   gBlockVariableDxeTokenSpaceGuid.PcdNvStorageVariableBlockSize|0x0|UINT32|0x00000002                   
   gBlockVariableDxeTokenSpaceGuid.PcdNvStorageVariableBlockLba|0x0|UINT32|0x00000003                   
   gBlockVariableDxeTokenSpaceGuid.PcdNvStorageVariableBlockDevicePath|L""|VOID*|0x00000004
+  gBlockVariableDxeTokenSpaceGuid.PcdDwEmmcDxeBaseAddress|0x0|UINT32|0x00000005                   
+

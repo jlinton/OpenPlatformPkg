@@ -34,6 +34,10 @@
 
 STATIC EFI_PHYSICAL_ADDRESS      mMapNvStorageVariableBase;
 STATIC EFI_PHYSICAL_ADDRESS      mTempBuffer;
+STATIC EFI_PHYSICAL_ADDRESS      mTempBufferPa;
+EFI_PHYSICAL_ADDRESS gpIdmacDescBuf;
+EFI_PHYSICAL_ADDRESS gpIdmacDescBufPa;
+EFI_PHYSICAL_ADDRESS   DwEmmcDxeBaseAddress;
 STATIC EFI_EVENT mSetVirtualAddressMapEvent = NULL;
 STATIC UINTN DisableStorage = FALSE;
 
@@ -60,6 +64,24 @@ NotifySetVirtualAddressMap (
   if (EFI_ERROR (Status)) {
     DEBUG ((EFI_D_ERROR, "Unable to convert runtime pointer Status:%x\n", Status));
   }
+
+  Status = gRT->ConvertPointer ( 
+                  EFI_OPTIONAL_PTR, 
+                  (VOID **)&gpIdmacDescBuf 
+                  ); 
+  if (EFI_ERROR (Status)) {
+    DEBUG ((EFI_D_ERROR, "Unable to convert runtime pointer Status:%x\n", Status));
+  }
+
+
+  Status = gRT->ConvertPointer ( 
+                  EFI_OPTIONAL_PTR, 
+                  (VOID **)&DwEmmcDxeBaseAddress 
+                  ); 
+  if (EFI_ERROR (Status)) {
+    DEBUG ((EFI_D_ERROR, "Unable to convert runtime pointer Status:%x\n", Status));
+  }
+
 
   DisableStorage = TRUE;
 
@@ -170,6 +192,10 @@ exit:
   return Status;
 }
 
+
+EFI_STATUS DwEmmcReadBlockData(IN EFI_LBA Lba, IN UINTN Length,  IN UINT32 *Buffer, IN UINT32 *BufferPa);
+EFI_STATUS DwEmmcWriteBlockData(IN EFI_LBA Lba, IN UINTN Length,  IN UINT32 *Buffer, IN UINT32 *BufferPa);
+
 EFI_STATUS
 EFIAPI
 FvbWrite (
@@ -181,43 +207,48 @@ FvbWrite (
   )
 {
   BLOCK_VARIABLE_INSTANCE       *Instance;
-  EFI_BLOCK_IO_PROTOCOL         *BlockIo;
+//  EFI_BLOCK_IO_PROTOCOL         *BlockIo;
   EFI_STATUS                    Status;
   UINTN                         Bytes;
   VOID                          *DataPtr = (VOID *)mTempBuffer;
 
 
   Instance = CR (This, BLOCK_VARIABLE_INSTANCE, FvbProtocol, BLOCK_VARIABLE_SIGNATURE);
-  BlockIo = Instance->BlockIoProtocol;
+//  BlockIo = Instance->BlockIoProtocol;
   Bytes = (Offset + *NumBytes + Instance->Media.BlockSize - 1) / Instance->Media.BlockSize * Instance->Media.BlockSize;
 //  DataPtr = AllocateZeroPool (Bytes);
 //  if (DataPtr == NULL) {
 //    DEBUG ((EFI_D_ERROR, "FvbWrite: failed to allocate buffer.\n"));
 //    return EFI_BUFFER_TOO_SMALL;
 //  }
-  if (DisableStorage)  {
-     return EFI_SUCCESS;
-  }
-  WriteBackDataCacheRange (DataPtr, Bytes);
-  Status = BlockIo->ReadBlocks (BlockIo, BlockIo->Media->MediaId, Instance->StartLba + Lba,
-                                Bytes, DataPtr);
 
+//  if (DisableStorage)  {
+//     return EFI_SUCCESS;
+//  }
+  WriteBackDataCacheRange (DataPtr, Bytes);
+
+
+//  DEBUG ((EFI_D_ERROR, "FvbWrite (read) StartLba:%x, Lba:%x, Offset:%x\n",  Instance->StartLba, Lba, Offset));
+
+  Status = DwEmmcReadBlockData (Instance->StartLba + Lba, Bytes, DataPtr, (VOID*)mTempBufferPa);
+//  Status = BlockIo->ReadBlocks (BlockIo, BlockIo->Media->MediaId, Instance->StartLba + Lba, Bytes, DataPtr);
   if (EFI_ERROR (Status)) {
     DEBUG ((EFI_D_ERROR, "FvbWrite: failed on reading blocks.\n"));
     goto exit;
   }
+
   CopyMem (DataPtr + Offset, Buffer, *NumBytes);
   WriteBackDataCacheRange (DataPtr, Bytes);
-  Status = BlockIo->WriteBlocks (BlockIo, BlockIo->Media->MediaId, Instance->StartLba + Lba,
-                                 Bytes, DataPtr);
+//  Status = BlockIo->WriteBlocks (BlockIo, BlockIo->Media->MediaId, Instance->StartLba + Lba, Bytes, DataPtr);
+  Status = DwEmmcWriteBlockData (Instance->StartLba + Lba, Bytes, DataPtr, (VOID*)mTempBufferPa);
   if (EFI_ERROR (Status)) {
     DEBUG ((EFI_D_ERROR, "FvbWrite StartLba:%x, Lba:%x, Offset:%x, Status:%x\n",
             Instance->StartLba, Lba, Offset, Status));
   }
   // Sometimes the variable isn't flushed into block device if it's the last flush operation.
-  // So flush it again.
-  Status = BlockIo->WriteBlocks (BlockIo, BlockIo->Media->MediaId, Instance->StartLba + Lba,
-                                 Bytes, DataPtr);
+  // So flush it again. JL??!!!
+//  Status = BlockIo->WriteBlocks (BlockIo, BlockIo->Media->MediaId, Instance->StartLba + Lba, Bytes, DataPtr);
+  Status = DwEmmcWriteBlockData (Instance->StartLba + Lba, Bytes, DataPtr, (VOID*)mTempBufferPa);
   if (EFI_ERROR (Status)) {
     DEBUG ((EFI_D_ERROR, "FvbWrite StartLba:%x, Lba:%x, Offset:%x, Status:%x\n",
             Instance->StartLba, Lba, Offset, Status));
@@ -399,7 +430,7 @@ BlockVariableDxeInitialize (
   UINTN                           HeadersLength;
 
   DisableStorage = FALSE;
-  DEBUG ((EFI_D_ERROR, "Starting persisten variable storage\n"));
+  DEBUG ((EFI_D_ERROR, "Starting persistent variable storage\n"));
   Instance->Signature = BLOCK_VARIABLE_SIGNATURE;
 
   HeadersLength = sizeof(EFI_FIRMWARE_VOLUME_HEADER) + sizeof(EFI_FV_BLOCK_MAP_ENTRY) + sizeof(VARIABLE_STORE_HEADER);
@@ -408,6 +439,20 @@ BlockVariableDxeInitialize (
     DEBUG ((EFI_D_ERROR, "%a: failed to allocate memory of Headers\n", __func__));
     return EFI_OUT_OF_RESOURCES;
   }
+
+  DwEmmcDxeBaseAddress = PcdGet32 (PcdDwEmmcDxeBaseAddress);
+  Status = gDS->AddMemorySpace (EfiGcdMemoryTypeMemoryMappedIo, DwEmmcDxeBaseAddress, SIZE_4KB, EFI_MEMORY_UC | EFI_MEMORY_RUNTIME );
+  if (EFI_ERROR (Status)) {
+    DEBUG ((EFI_D_ERROR, "%a: failed to reserve MMIO for dwmmc\n", __func__));
+    return Status;
+  }
+
+  Status = gDS->SetMemorySpaceAttributes (DwEmmcDxeBaseAddress, SIZE_4KB, EFI_MEMORY_UC | EFI_MEMORY_RUNTIME);
+  if (EFI_ERROR (Status)) {
+    DEBUG ((EFI_D_ERROR, "%a: failed to reserve MMIO for dwmmc\n", __func__));
+    return Status;
+  }
+
 
   Lba = (EFI_LBA) PcdGet32 (PcdNvStorageVariableBlockLba);
   Count = PcdGet32 (PcdNvStorageVariableBlockCount);
@@ -436,6 +481,19 @@ BlockVariableDxeInitialize (
     DEBUG ((EFI_D_ERROR, "Warning: Couldn't allocate temp runtime pages (status: %r)\n", Status));
     return EFI_INVALID_PARAMETER;
   }
+
+  Status = gBS->AllocatePages (AllocateAnyPages, EfiRuntimeServicesData, EFI_SIZE_TO_PAGES(1024*1024*2), &gpIdmacDescBuf); //2M temp buffer
+  
+  if (EFI_ERROR(Status)) {
+    DEBUG ((EFI_D_ERROR, "Warning: Couldn't allocate temp runtime pages descbuf (status: %r)\n", Status));
+    return EFI_INVALID_PARAMETER;
+  }
+
+  // save of the efi addrs as the Pa's for DMA (won't work if linux sticks a SMMU in front of us..)
+  mTempBufferPa = mTempBuffer;
+  gpIdmacDescBufPa = gpIdmacDescBuf;
+
+
 
 
   // ok we have the pages and we are a runtime service, so we need notification when a va is associated with the pa

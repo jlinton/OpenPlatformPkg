@@ -16,37 +16,35 @@
 #ifndef __DWEMMC_H__
 #define __DWEMMC_H__
 
-#include <Protocol/EmbeddedGpio.h>
-
 // DW MMC Registers
-#define DWEMMC_CTRL             ((UINT32)PcdGet32 (PcdDwEmmcDxeBaseAddress) + 0x000)
-#define DWEMMC_PWREN            ((UINT32)PcdGet32 (PcdDwEmmcDxeBaseAddress) + 0x004)
-#define DWEMMC_CLKDIV           ((UINT32)PcdGet32 (PcdDwEmmcDxeBaseAddress) + 0x008)
-#define DWEMMC_CLKSRC           ((UINT32)PcdGet32 (PcdDwEmmcDxeBaseAddress) + 0x00c)
-#define DWEMMC_CLKENA           ((UINT32)PcdGet32 (PcdDwEmmcDxeBaseAddress) + 0x010)
-#define DWEMMC_TMOUT            ((UINT32)PcdGet32 (PcdDwEmmcDxeBaseAddress) + 0x014)
-#define DWEMMC_CTYPE            ((UINT32)PcdGet32 (PcdDwEmmcDxeBaseAddress) + 0x018)
-#define DWEMMC_BLKSIZ           ((UINT32)PcdGet32 (PcdDwEmmcDxeBaseAddress) + 0x01c)
-#define DWEMMC_BYTCNT           ((UINT32)PcdGet32 (PcdDwEmmcDxeBaseAddress) + 0x020)
-#define DWEMMC_INTMASK          ((UINT32)PcdGet32 (PcdDwEmmcDxeBaseAddress) + 0x024)
-#define DWEMMC_CMDARG           ((UINT32)PcdGet32 (PcdDwEmmcDxeBaseAddress) + 0x028)
-#define DWEMMC_CMD              ((UINT32)PcdGet32 (PcdDwEmmcDxeBaseAddress) + 0x02c)
-#define DWEMMC_RESP0            ((UINT32)PcdGet32 (PcdDwEmmcDxeBaseAddress) + 0x030)
-#define DWEMMC_RESP1            ((UINT32)PcdGet32 (PcdDwEmmcDxeBaseAddress) + 0x034)
-#define DWEMMC_RESP2            ((UINT32)PcdGet32 (PcdDwEmmcDxeBaseAddress) + 0x038)
-#define DWEMMC_RESP3            ((UINT32)PcdGet32 (PcdDwEmmcDxeBaseAddress) + 0x03c)
-#define DWEMMC_RINTSTS          ((UINT32)PcdGet32 (PcdDwEmmcDxeBaseAddress) + 0x044)
-#define DWEMMC_STATUS           ((UINT32)PcdGet32 (PcdDwEmmcDxeBaseAddress) + 0x048)
-#define DWEMMC_FIFOTH           ((UINT32)PcdGet32 (PcdDwEmmcDxeBaseAddress) + 0x04c)
-#define DWEMMC_DEBNCE           ((UINT32)PcdGet32 (PcdDwEmmcDxeBaseAddress) + 0x064)
-#define DWEMMC_UHSREG           ((UINT32)PcdGet32 (PcdDwEmmcDxeBaseAddress) + 0x074)
-#define DWEMMC_BMOD             ((UINT32)PcdGet32 (PcdDwEmmcDxeBaseAddress) + 0x080)
-#define DWEMMC_DBADDR           ((UINT32)PcdGet32 (PcdDwEmmcDxeBaseAddress) + 0x088)
-#define DWEMMC_IDSTS            ((UINT32)PcdGet32 (PcdDwEmmcDxeBaseAddress) + 0x08c)
-#define DWEMMC_IDINTEN          ((UINT32)PcdGet32 (PcdDwEmmcDxeBaseAddress) + 0x090)
-#define DWEMMC_DSCADDR          ((UINT32)PcdGet32 (PcdDwEmmcDxeBaseAddress) + 0x094)
-#define DWEMMC_BUFADDR          ((UINT32)PcdGet32 (PcdDwEmmcDxeBaseAddress) + 0x098)
-#define DWEMMC_CARDTHRCTL       ((UINT32)PcdGet32 (PcdDwEmmcDxeBaseAddress) + 0X100)
+#define DWEMMC_CTRL             ((UINT64)DwEmmcDxeBaseAddress + 0x000)
+#define DWEMMC_PWREN            ((UINT64)DwEmmcDxeBaseAddress + 0x004)
+#define DWEMMC_CLKDIV           ((UINT64)DwEmmcDxeBaseAddress + 0x008)
+#define DWEMMC_CLKSRC           ((UINT64)DwEmmcDxeBaseAddress + 0x00c)
+#define DWEMMC_CLKENA           ((UINT64)DwEmmcDxeBaseAddress + 0x010)
+#define DWEMMC_TMOUT            ((UINT64)DwEmmcDxeBaseAddress + 0x014)
+#define DWEMMC_CTYPE            ((UINT64)DwEmmcDxeBaseAddress + 0x018)
+#define DWEMMC_BLKSIZ           ((UINT64)DwEmmcDxeBaseAddress + 0x01c)
+#define DWEMMC_BYTCNT           ((UINT64)DwEmmcDxeBaseAddress + 0x020)
+#define DWEMMC_INTMASK          ((UINT64)DwEmmcDxeBaseAddress + 0x024)
+#define DWEMMC_CMDARG           ((UINT64)DwEmmcDxeBaseAddress + 0x028)
+#define DWEMMC_CMD              ((UINT64)DwEmmcDxeBaseAddress + 0x02c)
+#define DWEMMC_RESP0            ((UINT64)DwEmmcDxeBaseAddress + 0x030)
+#define DWEMMC_RESP1            ((UINT64)DwEmmcDxeBaseAddress + 0x034)
+#define DWEMMC_RESP2            ((UINT64)DwEmmcDxeBaseAddress + 0x038)
+#define DWEMMC_RESP3            ((UINT64)DwEmmcDxeBaseAddress + 0x03c)
+#define DWEMMC_RINTSTS          ((UINT64)DwEmmcDxeBaseAddress + 0x044)
+#define DWEMMC_STATUS           ((UINT64)DwEmmcDxeBaseAddress + 0x048)
+#define DWEMMC_FIFOTH           ((UINT64)DwEmmcDxeBaseAddress + 0x04c)
+#define DWEMMC_DEBNCE           ((UINT64)DwEmmcDxeBaseAddress + 0x064)
+#define DWEMMC_UHSREG           ((UINT64)DwEmmcDxeBaseAddress + 0x074)
+#define DWEMMC_BMOD             ((UINT64)DwEmmcDxeBaseAddress + 0x080)
+#define DWEMMC_DBADDR           ((UINT64)DwEmmcDxeBaseAddress + 0x088)
+#define DWEMMC_IDSTS            ((UINT64)DwEmmcDxeBaseAddress + 0x08c)
+#define DWEMMC_IDINTEN          ((UINT64)DwEmmcDxeBaseAddress + 0x090)
+#define DWEMMC_DSCADDR          ((UINT64)DwEmmcDxeBaseAddress + 0x094)
+#define DWEMMC_BUFADDR          ((UINT64)DwEmmcDxeBaseAddress + 0x098)
+#define DWEMMC_CARDTHRCTL       ((UINT64)DwEmmcDxeBaseAddress + 0X100)
 
 #define CMD_UPDATE_CLK                          0x80202000
 #define CMD_START_BIT                           (1 << 31)
@@ -123,5 +121,17 @@
 
 #define DWEMMC_CARD_RD_THR(x)                   ((x & 0xfff) << 16)
 #define DWEMMC_CARD_RD_THR_EN                   (1 << 0)
+
+
+typedef struct {
+  UINT32                        Des0;
+  UINT32                        Des1;
+  UINT32                        Des2;
+  UINT32                        Des3;
+} DWEMMC_IDMAC_DESCRIPTOR;
+
+#define DWEMMC_BLOCK_SIZE               512
+#define DWEMMC_DMA_BUF_SIZE             EFI_PAGE_SIZE
+#define DWEMMC_MAX_DESC_PAGES           512 //2M of descriptors, Really?
 
 #endif  // __DWEMMC_H__
