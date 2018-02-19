@@ -1936,7 +1936,7 @@ DwUsbDriverBindingStop (
 		return Status;
 	}
 
-	DwHc = DWHC_FROM_THIS (This);
+	DwHc = DWHC_FROM_THIS (Usb2Hc);
 
 	Status = gBS->UninstallProtocolInterface (
 		Controller,
