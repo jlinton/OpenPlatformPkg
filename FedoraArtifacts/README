@@ -1,0 +1,10 @@
+This is a dump location for prebuild/collected binary images.
+
+The ptable-fedora.img and  HikeyDebugFip.bin should replace the normal ptable
+and fip provided by linaro. 
+
+The TIInit_11.8.32.bts and wl18xx-conf.bin will enable Wifi and Bluetooth.
+The files should be placed in /lib/firmware/ti-connectivity or wherever you
+see the kernel your running complaining about missing firmware files. If the
+kernel complains about a different version, you may be able to find it by
+googling, but the included versions should work for 4.16+ kernels IIRC.
