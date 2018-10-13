@@ -13,6 +13,8 @@
 *
 **/
 
+// https://lists.denx.de/pipermail/u-boot/2015-July/218687.html
+// [U-Boot] [PATCH v2 2/6] ARM: hi6220: Add register and bitfield definition header files.
 #ifndef __HI6220_REGS_PERI_H__
 #define __HI6220_REGS_PERI_H__
 
