@@ -280,7 +280,7 @@ Wait4Chhltd (
     MicroSecondDelay (100);
     Hcint = MmioRead32 (DwHc->DwUsbBase + HCINT(Channel));
     if (Hcint & DWC2_HCINT_STALL) {
-        DEBUG ((EFI_D_ERROR, "Wait4Chhltd: STALL Hcint=%X\n", Hcint));
+        DEBUG ((EFI_D_VERBOSE, "Wait4Chhltd: STALL Hcint=%X\n", Hcint));
 		DwUsbAttemptClear(DwHc, Channel);
         return EFI_USB_ERR_STALL;
     }
@@ -330,7 +330,7 @@ Wait4Chhltd (
 
     if (Hcint != HcintCompHltAck) {
         DEBUG ((EFI_D_ERROR, "Wait4Chhltd: HCINT Error 0x%x\n", Hcint));
-        return EFI_USB_ERR_STALL; //JL take this out to unstick device?
+        return EFI_USB_ERR_SYSTEM;
     }
 
     Hctsiz = MmioRead32 (DwHc->DwUsbBase + HCTSIZ(Channel));
@@ -1047,14 +1047,14 @@ DwHcControlTransfer (
 						   Translator->TranslatorPortNumber, Translator->TranslatorHubAddress, 0, TimeOut);
 
     if (EFI_ERROR(Status)) {
-        DEBUG ((EFI_D_ERROR, "DwHcControlTransfer: Setup Stage Error\n"));
+        DEBUG ((EFI_D_ERROR, "DwHcControlTransfer: Setup Stage Error, things have gone wonky, so be patient\n"));
 		if ((DeviceSpeed != EFI_USB_SPEED_HIGH) && (DwHc->AtFullSpeed == 0))
 		{
 			DEBUG ((EFI_D_ERROR, "DwHcControlTransfer: Split transaction failed, reducing bus speed\n"));
 			DwHc->AtFullSpeed = 1;
 			DwHcReset(This, 0);
 		}
-		Status = EFI_USB_ERR_SYSTEM;
+		Status = EFI_DEVICE_ERROR;
         goto EXIT;
     }
 
@@ -1071,7 +1071,7 @@ DwHcControlTransfer (
 							   Translator->TranslatorPortNumber, Translator->TranslatorHubAddress, 0, TimeOut);
 
         if (EFI_ERROR(Status)) {
-            DEBUG ((EFI_D_ERROR, "DwHcControlTransfer: Data Stage Error\n"));
+            DEBUG ((EFI_D_VERBOSE, "DwHcControlTransfer: Data Stage Error\n"));
             goto EXIT;
         }
     }
