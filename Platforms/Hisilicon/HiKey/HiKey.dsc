@@ -130,7 +130,13 @@
   # Add support for GCC stack protector
   NULL|MdePkg/Library/BaseStackCheckLib/BaseStackCheckLib.inf
 
-
+  # secure boot..
+  IntrinsicLib|CryptoPkg/Library/IntrinsicLib/IntrinsicLib.inf
+  OpensslLib|CryptoPkg/Library/OpensslLib/OpensslLib.inf
+  BaseCryptLib|CryptoPkg/Library/BaseCryptLib/PeiCryptLib.inf
+  BaseCryptLib|CryptoPkg/Library/BaseCryptLib/BaseCryptLib.inf
+#  BaseCryptLib|CryptoPkg/Library/BaseCryptLib/SmmCryptLib.inf
+  SecurityPkg|SecurityPkg/Library/PlatformSecureLibNull/PlatformSecureLibNull.inf
 
 [LibraryClasses.common.SEC]
   PrePiLib|EmbeddedPkg/Library/PrePiLib/PrePiLib.inf
@@ -167,6 +173,7 @@
   HobLib|MdePkg/Library/DxeHobLib/DxeHobLib.inf
   MemoryAllocationLib|MdePkg/Library/UefiMemoryAllocationLib/UefiMemoryAllocationLib.inf
   ReportStatusCodeLib|IntelFrameworkModulePkg/Library/DxeReportStatusCodeLibFramework/DxeReportStatusCodeLib.inf
+  BaseCryptLib|CryptoPkg/Library/BaseCryptLib/RuntimeCryptLib.inf
 
 [BuildOptions]
   GCC:*_*_*_PLATFORM_FLAGS = -I$(WORKSPACE)/OpenPlatformPkg/Chips/Hisilicon/Hi6220/Include -I$(WORKSPACE)/OpenPlatformPkg/Platforms/Hisilicon/HiKey/Include
@@ -252,6 +259,7 @@
   gEfiMdePkgTokenSpaceGuid.PcdDebugPrintErrorLevel|0x8000000F
 #  gEfiMdePkgTokenSpaceGuid.PcdDebugPrintErrorLevel|0x8040000F
 #  gEfiMdePkgTokenSpaceGuid.PcdDebugPrintErrorLevel|0x8FFFFFFF
+#   gEfiMdePkgTokenSpaceGuid.PcdDebugPrintErrorLevel|0x8F4FF04F
 
   gEfiMdePkgTokenSpaceGuid.PcdReportStatusCodePropertyMask|0x07
 
@@ -406,7 +414,15 @@
   #
   ArmPkg/Drivers/CpuDxe/CpuDxe.inf
   MdeModulePkg/Core/RuntimeDxe/RuntimeDxe.inf
-  MdeModulePkg/Universal/SecurityStubDxe/SecurityStubDxe.inf
+  MdeModulePkg/Universal/SecurityStubDxe/SecurityStubDxe.inf {
+    <LibraryClasses>
+      NULL|SecurityPkg/Library/DxeImageVerificationLib/DxeImageVerificationLib.inf
+      TpmMeasurementLib|MdeModulePkg/Library/TpmMeasurementLibNull/TpmMeasurementLibNull.inf
+  }
+  SecurityPkg/VariableAuthenticated/SecureBootConfigDxe/SecureBootConfigDxe.inf {
+    <LibraryClasses>
+      PlatformSecureLib|SecurityPkg/Library/PlatformSecureLibNull/PlatformSecureLibNull.inf
+  } 
   MdeModulePkg/Universal/CapsuleRuntimeDxe/CapsuleRuntimeDxe.inf
   EmbeddedPkg/EmbeddedMonotonicCounter/EmbeddedMonotonicCounter.inf
 #  MdeModulePkg/Universal/ResetSystemRuntimeDxe/ResetSystemRuntimeDxe.inf
@@ -558,4 +574,16 @@
       # deprecated BdsLib from the ARM BDS
       BdsLib|ArmPkg/Library/BdsLib/BdsLib.inf
       FdtLib|EmbeddedPkg/Library/FdtLib/FdtLib.inf
+  }
+
+[Components.AARCH64]
+  #
+  # EBC
+  #
+  MdeModulePkg/Universal/EbcDxe/EbcDxe.inf
+
+  SecurityPkg/RandomNumberGenerator/RngDxe/RngDxe.inf {
+    <LibraryClasses>
+      # DO NOT USE THIS LIBRARY FOR PRODUCTION DEVICES
+      RngLib|OpenPlatformPkg/Platforms/ARM/Binary/Library/PseudoRngLib/PseudoRngLib.inf
   }
