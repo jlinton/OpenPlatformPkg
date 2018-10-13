@@ -56,3 +56,5 @@ booted won't be stored to the emmc. Variables written before exit boot
 service (aka when the firmware is running) should be saved.
 
 The "upstream" for this project is https://git.linaro.org/uefi/OpenPlatformPkg.git
+It is current built against an edk2 at commit
+401d1343cb BaseTools/Eot: register MM Module types with FFS class.

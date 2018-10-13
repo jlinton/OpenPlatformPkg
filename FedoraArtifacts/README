@@ -8,3 +8,23 @@ The files should be placed in /lib/firmware/ti-connectivity or wherever you
 see the kernel your running complaining about missing firmware files. If the
 kernel complains about a different version, you may be able to find it by
 googling, but the included versions should work for 4.16+ kernels IIRC.
+
+If installing to SD, the upstream developers haven't fixed the DW->reset
+driver dependency. The easy fix during install is when you see:
+
+".
+Storing configuration files and kickstarts
+..
+Installation complete. Press ENTER to quit:
+"
+hit esc-tab
+
+then type:
+`chroot /mnt/sysimage`
+`dracut --add-drivers hi6220-reset -f /boot/initramfs-4.18.xxx.aarch64 4.18.xxx.aarch64 --force`
+`exit`
+replacing xxx with whatever you find as the kernel version.
+
+then esc-tab back to the "main" window and reboot.
+
+
